@@ -1,5 +1,5 @@
-#ifndef BARE_MODULE_LEXER_CJS_H
-#define BARE_MODULE_LEXER_CJS_H
+#ifndef BARE_MODULE_LEXER_H
+#define BARE_MODULE_LEXER_H
 
 #include <js.h>
 #include <stdbool.h>
@@ -524,4 +524,4 @@ err:
   return -1;
 }
 
-#endif // BARE_MODULE_LEXER_CJS_H
+#endif // BARE_MODULE_LEXER_H
