@@ -96,9 +96,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 #define bc(t, l) (i + l < n && bu(t, l))
 
   while (i < n) {
-    while (i < n && ws(u(0))) {
-      i++;
-    }
+    while (i < n && ws(u(0))) i++;
 
     if (i + 7 >= n) break;
 
@@ -111,34 +109,24 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     else if (bu("import", 6)) {
       i += 6;
 
-      while (i < n && ws(u(0))) {
-        i++;
-      }
+      while (i < n && ws(u(0))) i++;
 
       // import \*
       if (c(0) == '*') {
         i++;
 
-        while (i < n && ws(u(0))) {
-          i++;
-        }
+        while (i < n && ws(u(0))) i++;
 
         // import \* as
         if (i + 3 < n && bu("as", 2) && ws(u(2))) {
           i += 3;
 
-          while (i < n && ws(u(0))) {
-            i++;
-          }
+          while (i < n && ws(u(0))) i++;
 
           // import \* as [^\s]+
-          while (i < n && !ws(u(0))) {
-            i++;
-          }
+          while (i < n && !ws(u(0))) i++;
 
-          while (i < n && ws(u(0))) {
-            i++;
-          }
+          while (i < n && ws(u(0))) i++;
 
           // import \* as [^\s]+ from
           if (bc("from", 4)) {
@@ -154,17 +142,13 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         i++;
 
         // import {[^}]*
-        while (i < n && u(0) != '}') {
-          i++;
-        }
+        while (i < n && u(0) != '}') i++;
 
         // import {[^}]*}
         if (c(0) == '}') {
           i++;
 
-          while (i < n && ws(u(0))) {
-            i++;
-          }
+          while (i < n && ws(u(0))) i++;
 
           // import {[^}]*} from
           if (bc("from", 4)) {
@@ -181,9 +165,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
         j = ++i;
 
-        while (i < n && u(0) != e) {
-          i++;
-        }
+        while (i < n && u(0) != e) i++;
 
         // import ['"].*['"]
         if (c(0) == e) {
@@ -197,18 +179,12 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
 
       else {
-        while (i < n && ws(u(0))) {
-          i++;
-        }
+        while (i < n && ws(u(0))) i++;
 
         // import [^\s]+
-        while (i < n && !ws(u(0))) {
-          i++;
-        }
+        while (i < n && !ws(u(0))) i++;
 
-        while (i < n && ws(u(0))) {
-          i++;
-        }
+        while (i < n && ws(u(0))) i++;
 
         // import [^\s]+ from
         if (bc("from", 4)) {
@@ -222,17 +198,13 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     else if (bu("module", 6)) {
       i += 6;
 
-      while (i < n && ws(u(0))) {
-        i++;
-      }
+      while (i < n && ws(u(0))) i++;
 
       // module\.
       if (c(0) == '.') {
         i++;
 
-        while (i < n && ws(u(0))) {
-          i++;
-        }
+        while (i < n && ws(u(0))) i++;
 
         // module\.exports
         if (bc("exports", 7)) {
@@ -244,18 +216,16 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     }
 
     else if (bu("export", 6)) {
+      i += 6;
+
       // exports
-      if (c(6) == 's') {
-        i += 7;
+      if (c(0) == 's') {
+        i++;
 
         goto exports;
       }
 
-      i += 6;
-
-      while (i < n && ws(u(0))) {
-        i++;
-      }
+      while (i < n && ws(u(0))) i++;
     }
 
     else {
@@ -265,17 +235,13 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     continue;
 
   require:
-    while (i < n && ws(u(0))) {
-      i++;
-    }
+    while (i < n && ws(u(0))) i++;
 
     // require\.
     if (c(0) == '.') {
       i++;
 
-      while (i < n && ws(u(0))) {
-        i++;
-      }
+      while (i < n && ws(u(0))) i++;
 
       // require\.a
       if (i + 5 < n && u(0) == 'a') {
@@ -285,9 +251,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         if (bu("ddon", 4)) {
           i += 4;
 
-          while (i < n && ws(u(0))) {
-            i++;
-          }
+          while (i < n && ws(u(0))) i++;
 
           type = bare_module_lexer_addon;
         }
@@ -296,9 +260,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         else if (bu("sset", 4)) {
           i += 4;
 
-          while (i < n && ws(u(0))) {
-            i++;
-          }
+          while (i < n && ws(u(0))) i++;
 
           type = bare_module_lexer_asset;
         }
@@ -309,9 +271,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     if (c(0) == '(') {
       i++;
 
-      while (i < n && ws(u(0))) {
-        i++;
-      }
+      while (i < n && ws(u(0))) i++;
 
       // require(\.(addon|asset))?\(['"]
       if (c(0) == '\'' || c(0) == '"') {
@@ -319,9 +279,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
         j = ++i;
 
-        while (i < n && u(0) != e) {
-          i++;
-        }
+        while (i < n && u(0) != e) i++;
 
         // require(\.(addon|asset))?\(['"].*['"]
         if (c(0) == e) {
@@ -329,13 +287,9 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
           i++;
 
-          while (i < n && ws(u(0))) {
-            i++;
-          }
+          while (i < n && ws(u(0))) i++;
 
-          while (i < n && u(0) != ')') {
-            i++;
-          }
+          while (i < n && u(0) != ')') i++;
 
           // require(\.(addon|asset))?\(['"].*['"][^)]*\)
           if (c(0) == ')') {
@@ -354,17 +308,13 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     continue;
 
   exports:
-    while (i < n && ws(u(0))) {
-      i++;
-    }
+    while (i < n && ws(u(0))) i++;
 
     // exports =
     if (c(0) == '=') {
       i++;
 
-      while (i < n && ws(u(0))) {
-        i++;
-      }
+      while (i < n && ws(u(0))) i++;
 
       // exports = \{
       if (c(0) == '{') {
@@ -384,21 +334,15 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     else if (c(0) == '.') {
       i++;
 
-      while (i < n && ws(u(0))) {
-        i++;
-      }
+      while (i < n && ws(u(0))) i++;
 
       j = i;
 
-      while (i < n && !ws(u(0)) && u(0) != '=') {
-        i++;
-      }
+      while (i < n && !ws(u(0)) && u(0) != '=') i++;
 
       k = i;
 
-      while (i < n && ws(u(0))) {
-        i++;
-      }
+      while (i < n && ws(u(0))) i++;
 
       // exports\.[^\s=] =
       if (c(0) == '=') {
@@ -413,9 +357,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     else if (c(0) == '[') {
       i++;
 
-      while (i < n && ws(u(0))) {
-        i++;
-      }
+      while (i < n && ws(u(0))) i++;
 
       // exports\[['"]
       if (c(0) == '\'' || c(0) == '"') {
@@ -423,9 +365,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
         j = ++i;
 
-        while (i < n && u(0) != e) {
-          i++;
-        }
+        while (i < n && u(0) != e) i++;
 
         // exports\[['"].*['"]
         if (c(0) == e) {
@@ -433,21 +373,15 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
           i++;
 
-          while (i < n && ws(u(0))) {
-            i++;
-          }
+          while (i < n && ws(u(0))) i++;
 
-          while (i < n && u(0) != ']') {
-            i++;
-          }
+          while (i < n && u(0) != ']') i++;
 
           // exports\[['"].*['"][^\]]*\]
           if (c(0) == ']') {
             i++;
 
-            while (i < n && ws(u(0))) {
-              i++;
-            }
+            while (i < n && ws(u(0))) i++;
 
             // exports\[['"].*['"][^\]]*\] =
             if (c(0) == '=') {
@@ -464,9 +398,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     continue;
 
   from:
-    while (i < n && ws(u(0))) {
-      i++;
-    }
+    while (i < n && ws(u(0))) i++;
 
     // from ['"]
     if (c(0) == '\'' || c(0) == '"') {
@@ -474,9 +406,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
       j = ++i;
 
-      while (i < n && u(0) != e) {
-        i++;
-      }
+      while (i < n && u(0) != e) i++;
 
       // from ['"].*['"]
       if (c(0) == e) {
