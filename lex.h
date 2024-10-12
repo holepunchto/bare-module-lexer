@@ -89,10 +89,10 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 // Whitespace character
 #define ws(c) (c == ' ' || c == '\t' || c == 0xb || c == 0xc || c == 0xa0)
 
-// Begins with strings, unchecked
+// Begins with string, unchecked
 #define bsu(t, l) (strncmp((const char *) &s[i], t, sizeof(t) - 1) == 0)
 
-// Begins with strings, checked
+// Begins with string, checked
 #define bsc(t, l) (i + l < n && bsu(t, l))
 
   while (i < n) {
