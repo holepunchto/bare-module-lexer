@@ -90,7 +90,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 #define ws(c) (c == ' ' || c == '\t' || c == 0xb || c == 0xc || c == 0xa0)
 
 // Begins with string, unchecked
-#define bu(t, l) (strncmp((const char *) &s[i], t, sizeof(t) - 1) == 0)
+#define bu(t, l) (strncmp((const char *) &s[i], t, l) == 0)
 
 // Begins with string, checked
 #define bc(t, l) (i + l < n && bu(t, l))
@@ -100,13 +100,15 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       i++;
     }
 
-    if (bc("require", 7)) {
+    if (i + 7 >= n) break;
+
+    if (bu("require", 7)) {
       i += 7;
 
       goto require;
     }
 
-    if (bc("import", 6)) {
+    else if (bu("import", 6)) {
       i += 6;
 
       while (i < n && ws(u(0))) {
@@ -217,7 +219,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
     }
 
-    if (bc("module", 6)) {
+    else if (bu("module", 6)) {
       i += 6;
 
       while (i < n && ws(u(0))) {
@@ -241,7 +243,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
     }
 
-    if (bc("export", 6)) {
+    else if (bu("export", 6)) {
       // exports
       if (c(6) == 's') {
         i += 7;
@@ -256,7 +258,9 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
     }
 
-    i++;
+    else {
+      i++;
+    }
 
     continue;
 
