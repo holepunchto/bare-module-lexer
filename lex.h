@@ -89,20 +89,24 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 // Whitespace character
 #define ws(c) (c == ' ' || c == '\t' || c == 0xb || c == 0xc || c == 0xa0)
 
+// Begins with strings, unchecked
+#define bsu(t, l) (strncmp((const char *) &s[i], t, sizeof(t) - 1) == 0)
+
+// Begins with strings, checked
+#define bsc(t, l) (i + l < n && bsu(t, l))
+
   while (i < n) {
     while (i < n && ws(u(0))) {
       i++;
     }
 
-    // require
-    if (i + 7 < n && u(0) == 'r' && u(1) == 'e' && u(2) == 'q' && u(3) == 'u' && u(4) == 'i' && u(5) == 'r' && u(6) == 'e') {
+    if (bsc("require", 7)) {
       i += 7;
 
       goto require;
     }
 
-    // import
-    if (i + 6 < n && u(0) == 'i' && u(1) == 'm' && u(2) == 'p' && u(3) == 'o' && u(4) == 'r' && u(5) == 't') {
+    if (bsc("import", 6)) {
       i += 6;
 
       while (i < n && ws(u(0))) {
@@ -118,7 +122,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         }
 
         // import \* as
-        if (i + 3 < n && u(0) == 'a' && u(1) == 's' && ws(u(2))) {
+        if (i + 3 < n && bsu("as", 2) && ws(u(2))) {
           i += 3;
 
           while (i < n && ws(u(0))) {
@@ -135,7 +139,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           }
 
           // import \* as [^\s]+ from
-          if (i + 4 < n && u(0) == 'f' && u(1) == 'r' && u(2) == 'o' && u(3) == 'm') {
+          if (bsc("from", 4)) {
             i += 4;
 
             goto from;
@@ -161,7 +165,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           }
 
           // import {[^}]*} from
-          if (i + 4 < n && u(0) == 'f' && u(1) == 'r' && u(2) == 'o' && u(3) == 'm') {
+          if (bsc("from", 4)) {
             i += 4;
 
             goto from;
@@ -205,7 +209,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         }
 
         // import [^\s]+ from
-        if (i + 4 < n && u(0) == 'f' && u(1) == 'r' && u(2) == 'o' && u(3) == 'm') {
+        if (bsc("from", 4)) {
           i += 4;
 
           goto from;
@@ -213,8 +217,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
     }
 
-    // module
-    if (i + 6 < n && u(0) == 'm' && u(1) == 'o' && u(2) == 'd' && u(3) == 'u' && u(4) == 'l' && u(5) == 'e') {
+    if (bsc("module", 6)) {
       i += 6;
 
       while (i < n && ws(u(0))) {
@@ -229,7 +232,8 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           i++;
         }
 
-        if (i + 7 < n && u(0) == 'e' && u(1) == 'x' && u(2) == 'p' && u(3) == 'o' && u(4) == 'r' && u(5) == 't' && u(6) == 's') {
+        // module\.exports
+        if (bsc("exports", 7)) {
           i += 7;
 
           goto exports;
@@ -237,8 +241,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
     }
 
-    // export
-    if (i + 6 < n && u(0) == 'e' && u(1) == 'x' && u(2) == 'p' && u(3) == 'o' && u(4) == 'r' && u(5) == 't') {
+    if (bsc("export", 6)) {
       // exports
       if (c(6) == 's') {
         i += 7;
@@ -272,9 +275,11 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
       // require\.a
       if (i + 5 < n && u(0) == 'a') {
+        i++;
+
         // require\.addon
-        if (u(1) == 'd' && u(2) == 'd' && u(3) == 'o' && u(4) == 'n') {
-          i += 5;
+        if (bsu("ddon", 4)) {
+          i += 4;
 
           while (i < n && ws(u(0))) {
             i++;
@@ -284,8 +289,8 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         }
 
         // require\.asset
-        else if (u(1) == 's' && u(2) == 's' && u(3) == 'e' && u(4) == 't') {
-          i += 5;
+        else if (bsu("sset", 4)) {
+          i += 4;
 
           while (i < n && ws(u(0))) {
             i++;
@@ -362,7 +367,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
 
       // exports = require
-      else if (i + 7 < n && u(0) == 'r' && u(1) == 'e' && u(2) == 'q' && u(3) == 'u' && u(4) == 'i' && u(5) == 'r' && u(6) == 'e') {
+      else if (bsc("require", 7)) {
         i += 7;
 
         exported = true;
@@ -486,6 +491,8 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 #undef u
 #undef c
 #undef ws
+#undef bsu
+#undef bsc
 
   return 0;
 
