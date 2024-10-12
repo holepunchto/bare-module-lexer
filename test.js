@@ -1,49 +1,77 @@
 const test = require('brittle')
 const lex = require('.')
 
-test('require', (t) => {
+test('require(\'id\')', (t) => {
   t.alike(lex('require(\'./foo.js\')'), {
     imports: [{ specifier: './foo.js', type: 0, exported: false }],
     exports: []
   })
 })
 
-test('require.addon', (t) => {
+test('require("id")', (t) => {
+  t.alike(lex('require("./foo.js")'), {
+    imports: [{ specifier: './foo.js', type: 0, exported: false }],
+    exports: []
+  })
+})
+
+test('require.addon(\'id\')', (t) => {
   t.alike(lex('require.addon(\'./foo.bare\')'), {
     imports: [{ specifier: './foo.bare', type: lex.constants.ADDON, exported: false }],
     exports: []
   })
 })
 
-test('require.asset', (t) => {
+test('require.addon("id")', (t) => {
+  t.alike(lex('require.addon("./foo.bare")'), {
+    imports: [{ specifier: './foo.bare', type: lex.constants.ADDON, exported: false }],
+    exports: []
+  })
+})
+
+test('require.asset(\'id\')', (t) => {
   t.alike(lex('require.asset(\'./foo.bare\')'), {
     imports: [{ specifier: './foo.bare', type: lex.constants.ASSET, exported: false }],
     exports: []
   })
 })
 
-test('require with type', (t) => {
+test('require.asset("id")', (t) => {
+  t.alike(lex('require.asset("./foo.bare")'), {
+    imports: [{ specifier: './foo.bare', type: lex.constants.ASSET, exported: false }],
+    exports: []
+  })
+})
+
+test('require(\'id\', { with: { type: \'name\' } })', (t) => {
   t.alike(lex('require(\'./foo.js\', { with: { type: \'script\' } })'), {
     imports: [{ specifier: './foo.js', type: 0, exported: false }],
     exports: []
   })
 })
 
-test('require module.exports assignment', (t) => {
+test('require("id", { with: { type: "name" } })', (t) => {
+  t.alike(lex('require("./foo.js", { with: { type: "script" } })'), {
+    imports: [{ specifier: './foo.js', type: 0, exported: false }],
+    exports: []
+  })
+})
+
+test('module.exports = require', (t) => {
   t.alike(lex('module.exports = require(\'./foo.js\')'), {
     imports: [{ specifier: './foo.js', type: 0, exported: true }],
     exports: []
   })
 })
 
-test('require exports assigment', (t) => {
+test('exports = require', (t) => {
   t.alike(lex('exports = require(\'./foo.js\')'), {
     imports: [{ specifier: './foo.js', type: 0, exported: true }],
     exports: []
   })
 })
 
-test('require module.exports and exports assigment', (t) => {
+test('module.exports = exports = require', (t) => {
   t.alike(lex('module.exports = exports = require(\'./foo.js\')'), {
     imports: [{ specifier: './foo.js', type: 0, exported: true }],
     exports: []
@@ -71,8 +99,22 @@ test('exports[\'name\']', (t) => {
   })
 })
 
+test('exports["name"]', (t) => {
+  t.alike(lex('exports["foo"] = 42'), {
+    imports: [],
+    exports: [{ name: 'foo' }]
+  })
+})
+
 test('module.exports[\'name\']', (t) => {
-  t.alike(lex('exports[\'foo\'] = 42'), {
+  t.alike(lex('module.exports[\'foo\'] = 42'), {
+    imports: [],
+    exports: [{ name: 'foo' }]
+  })
+})
+
+test('module.exports["name"]', (t) => {
+  t.alike(lex('module.exports["foo"] = 42'), {
     imports: [],
     exports: [{ name: 'foo' }]
   })
@@ -92,14 +134,14 @@ test('import * as', (t) => {
   })
 })
 
-test('import default from', (t) => {
+test('import default', (t) => {
   t.alike(lex('import foo from \'./foo.js\''), {
     imports: [{ specifier: './foo.js', type: 0, exported: false }],
     exports: []
   })
 })
 
-test('import named from', (t) => {
+test('import named', (t) => {
   t.alike(lex('import { foo } from \'./foo.js\''), {
     imports: [{ specifier: './foo.js', type: 0, exported: false }],
     exports: []
