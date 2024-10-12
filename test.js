@@ -38,9 +38,7 @@ test('require module.exports assignment', (t) => {
 
 test('require exports assigment', (t) => {
   t.alike(lex('exports = require(\'./foo.js\')'), {
-    imports: [
-      { specifier: './foo.js', type: 0, exported: true } // False positive
-    ],
+    imports: [{ specifier: './foo.js', type: 0, exported: true }],
     exports: []
   })
 })
