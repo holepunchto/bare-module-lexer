@@ -90,23 +90,23 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 #define ws(c) (c == ' ' || c == '\t' || c == 0xb || c == 0xc || c == 0xa0)
 
 // Begins with string, unchecked
-#define bsu(t, l) (strncmp((const char *) &s[i], t, sizeof(t) - 1) == 0)
+#define bu(t, l) (strncmp((const char *) &s[i], t, sizeof(t) - 1) == 0)
 
 // Begins with string, checked
-#define bsc(t, l) (i + l < n && bsu(t, l))
+#define bc(t, l) (i + l < n && bu(t, l))
 
   while (i < n) {
     while (i < n && ws(u(0))) {
       i++;
     }
 
-    if (bsc("require", 7)) {
+    if (bc("require", 7)) {
       i += 7;
 
       goto require;
     }
 
-    if (bsc("import", 6)) {
+    if (bc("import", 6)) {
       i += 6;
 
       while (i < n && ws(u(0))) {
@@ -122,7 +122,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         }
 
         // import \* as
-        if (i + 3 < n && bsu("as", 2) && ws(u(2))) {
+        if (i + 3 < n && bu("as", 2) && ws(u(2))) {
           i += 3;
 
           while (i < n && ws(u(0))) {
@@ -139,7 +139,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           }
 
           // import \* as [^\s]+ from
-          if (bsc("from", 4)) {
+          if (bc("from", 4)) {
             i += 4;
 
             goto from;
@@ -165,7 +165,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           }
 
           // import {[^}]*} from
-          if (bsc("from", 4)) {
+          if (bc("from", 4)) {
             i += 4;
 
             goto from;
@@ -209,7 +209,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         }
 
         // import [^\s]+ from
-        if (bsc("from", 4)) {
+        if (bc("from", 4)) {
           i += 4;
 
           goto from;
@@ -217,7 +217,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
     }
 
-    if (bsc("module", 6)) {
+    if (bc("module", 6)) {
       i += 6;
 
       while (i < n && ws(u(0))) {
@@ -233,7 +233,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         }
 
         // module\.exports
-        if (bsc("exports", 7)) {
+        if (bc("exports", 7)) {
           i += 7;
 
           goto exports;
@@ -241,7 +241,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
     }
 
-    if (bsc("export", 6)) {
+    if (bc("export", 6)) {
       // exports
       if (c(6) == 's') {
         i += 7;
@@ -278,7 +278,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         i++;
 
         // require\.addon
-        if (bsu("ddon", 4)) {
+        if (bu("ddon", 4)) {
           i += 4;
 
           while (i < n && ws(u(0))) {
@@ -289,7 +289,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         }
 
         // require\.asset
-        else if (bsu("sset", 4)) {
+        else if (bu("sset", 4)) {
           i += 4;
 
           while (i < n && ws(u(0))) {
@@ -367,7 +367,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
 
       // exports = require
-      else if (bsc("require", 7)) {
+      else if (bc("require", 7)) {
         i += 7;
 
         exported = true;
@@ -491,8 +491,8 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 #undef u
 #undef c
 #undef ws
-#undef bsu
-#undef bsc
+#undef bu
+#undef bc
 
   return 0;
 
