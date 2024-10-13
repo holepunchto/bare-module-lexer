@@ -62,6 +62,21 @@ bare_module_lexer_exports (js_env_t *env, js_value_t *exports) {
   V("lex", bare_module_lexer_lex)
 #undef V
 
+#define V(name, n) \
+  { \
+    js_value_t *val; \
+    err = js_create_uint32(env, n, &val); \
+    assert(err == 0); \
+    err = js_set_named_property(env, exports, name, val); \
+    assert(err == 0); \
+  }
+
+  V("REQUIRE", bare_module_lexer_require)
+  V("IMPORT", bare_module_lexer_import)
+  V("ADDON", bare_module_lexer_addon)
+  V("ASSET", bare_module_lexer_asset)
+#undef V
+
   return exports;
 }
 
