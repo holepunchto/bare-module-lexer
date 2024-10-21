@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(bare_module_lexer C)
+find_package(cmake-bare REQUIRED PATHS node_modules/cmake-bare)
 
-include(bare)
+project(bare_module_lexer C)
 
 add_bare_module(bare_module_lexer)
 
