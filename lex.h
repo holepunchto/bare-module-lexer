@@ -450,6 +450,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 #undef u
 #undef c
 #undef ws
+#undef lt
 #undef bu
 #undef bc
 
