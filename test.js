@@ -191,3 +191,17 @@ test('import named', (t) => {
     exports: []
   })
 })
+
+test('/* require(\'id\') */', (t) => {
+  t.alike(lex('/* require(\'./foo.js\') */'), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('// require(\'id\')', (t) => {
+  t.alike(lex('// require(\'./foo.js\')'), {
+    imports: [],
+    exports: []
+  })
+})

@@ -90,6 +90,9 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 // Whitespace character
 #define ws(c) (c == ' ' || c == '\t' || c == 0xb || c == 0xc || c == 0xa0)
 
+// Line terminator
+#define lt(c) (c == 0xa || c == 0xd)
+
 // Begins with string, unchecked
 #define bu(t, l) (strncmp((const char *) &s[i], t, l) == 0)
 
@@ -100,6 +103,26 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     while (i < n && ws(u(0))) i++;
 
     if (i + 7 >= n) break;
+
+    if (bu("//", 2)) {
+      i += 2;
+
+      while (i < n && !lt(u(0))) i++;
+
+      if (lt(c(0))) i++;
+
+      continue;
+    }
+
+    if (bu("/*", 2)) {
+      i += 2;
+
+      while (i + 1 < n && !bu("*/", 2)) i++;
+
+      if (bc("/*", 2)) i += 2;
+
+      continue;
+    }
 
     if (bu("require", 7)) {
       i += 7;
