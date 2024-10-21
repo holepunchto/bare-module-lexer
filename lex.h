@@ -12,10 +12,11 @@ enum {
   bare_module_lexer_import = 0x2,
   bare_module_lexer_addon = 0x4,
   bare_module_lexer_asset = 0x8,
+  bare_module_lexer_reexport = 0x10,
 };
 
 static inline int
-bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t i, const utf8_t *specifier, size_t len, int type, bool exported) {
+bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t i, const utf8_t *specifier, size_t len, int type) {
   int err;
 
   js_value_t *entry;
@@ -33,7 +34,6 @@ bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t i, c
 
   V("specifier", js_create_string_utf8, specifier, len);
   V("type", js_create_uint32, type);
-  V("exported", js_get_boolean, exported);
 #undef V
 
   err = js_set_element(env, imports, i, entry);
@@ -80,7 +80,6 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
   size_t k;
 
   int type = 0;
-  bool exported = false;
 
 // Current character, unchecked
 #define u(offset) (s[i + offset])
@@ -175,7 +174,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
           i++;
 
-          err = bare_module_lexer__add_import(env, imports, p++, &s[j], k - j, bare_module_lexer_import, false);
+          err = bare_module_lexer__add_import(env, imports, p++, &s[j], k - j, bare_module_lexer_import);
           if (err < 0) goto err;
         }
       }
@@ -237,7 +236,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     continue;
 
   require:
-    type = bare_module_lexer_require;
+    type |= bare_module_lexer_require;
 
     while (i < n && ws(u(0))) i++;
 
@@ -299,7 +298,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           if (c(0) == ')') {
             i++;
 
-            err = bare_module_lexer__add_import(env, imports, p++, &s[j], k - j, type, exported);
+            err = bare_module_lexer__add_import(env, imports, p++, &s[j], k - j, type);
             if (err < 0) goto err;
           }
         }
@@ -307,7 +306,6 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     }
 
     type = 0;
-    exported = false;
 
     continue;
 
@@ -328,7 +326,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       else if (bc("require", 7)) {
         i += 7;
 
-        exported = true;
+        type |= bare_module_lexer_reexport;
 
         goto require;
       }
@@ -418,7 +416,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
         i++;
 
-        err = bare_module_lexer__add_import(env, imports, p++, &s[j], k - j, bare_module_lexer_import, exported);
+        err = bare_module_lexer__add_import(env, imports, p++, &s[j], k - j, bare_module_lexer_import);
         if (err < 0) goto err;
       }
     }

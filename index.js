@@ -13,5 +13,6 @@ exports.constants = {
   REQUIRE: binding.REQUIRE,
   IMPORT: binding.IMPORT,
   ADDON: binding.ADDON,
-  ASSET: binding.ASSET
+  ASSET: binding.ASSET,
+  REEXPORT: binding.REEXPORT
 }

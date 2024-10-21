@@ -75,6 +75,7 @@ bare_module_lexer_exports (js_env_t *env, js_value_t *exports) {
   V("IMPORT", bare_module_lexer_import)
   V("ADDON", bare_module_lexer_addon)
   V("ASSET", bare_module_lexer_asset)
+  V("REEXPORT", bare_module_lexer_reexport)
 #undef V
 
   return exports;
