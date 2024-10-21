@@ -46,13 +46,16 @@ bare_module_lexer__add_position (js_env_t *env, js_value_t *entry, size_t statem
 }
 
 static inline int
-bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t i, const utf8_t *source, size_t import_start, size_t specifier_start, size_t specifier_end, int type) {
+bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t *i, const utf8_t *source, size_t import_start, size_t specifier_start, size_t specifier_end, int type, js_value_t *names) {
   assert(specifier_end > specifier_start);
 
   int err;
 
   js_value_t *entry;
   err = js_create_object(env, &entry);
+  assert(err == 0);
+
+  err = js_set_element(env, imports, *i, entry);
   assert(err == 0);
 
 #define V(key, fn, ...) \
@@ -68,23 +71,33 @@ bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t i, c
   V("type", js_create_uint32, type);
 #undef V
 
+  if (names == NULL) {
+    err = js_create_array(env, &names);
+    assert(err == 0);
+  }
+
+  err = js_set_named_property(env, entry, "names", names);
+  assert(err == 0);
+
   err = bare_module_lexer__add_position(env, entry, import_start, specifier_start, specifier_end);
   assert(err == 0);
 
-  err = js_set_element(env, imports, i, entry);
-  assert(err == 0);
+  *i += 1;
 
   return 0;
 }
 
 static inline int
-bare_module_lexer__add_export (js_env_t *env, js_value_t *exports, uint32_t i, const utf8_t *source, size_t export_start, size_t name_start, size_t name_end) {
+bare_module_lexer__add_export (js_env_t *env, js_value_t *exports, uint32_t *i, const utf8_t *source, size_t export_start, size_t name_start, size_t name_end) {
   assert(name_end > name_start);
 
   int err;
 
   js_value_t *entry;
   err = js_create_object(env, &entry);
+  assert(err == 0);
+
+  err = js_set_element(env, exports, *i, entry);
   assert(err == 0);
 
 #define V(key, fn, ...) \
@@ -102,8 +115,30 @@ bare_module_lexer__add_export (js_env_t *env, js_value_t *exports, uint32_t i, c
   err = bare_module_lexer__add_position(env, entry, export_start, name_start, name_end);
   assert(err == 0);
 
-  err = js_set_element(env, exports, i, entry);
+  *i += 1;
+
+  return 0;
+}
+
+static inline int
+bare_module_lexer__add_name (js_env_t *env, js_value_t **names, uint32_t *i, const utf8_t *name) {
+  int err;
+
+  if (*names == NULL) {
+    err = js_create_array(env, names);
+    assert(err == 0);
+
+    *i = 0;
+  }
+
+  js_value_t *string;
+  err = js_create_string_utf8(env, name, -1, &string);
   assert(err == 0);
+
+  err = js_set_element(env, *names, *i, string);
+  assert(err == 0);
+
+  *i += 1;
 
   return 0;
 }
@@ -124,6 +159,9 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
   size_t se; // Source end
 
   int type;
+
+  js_value_t *names;
+  uint32_t nl; // Names count
 
 // Current character, unchecked
 #define u(offset) (s[i + offset])
@@ -169,6 +207,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
     }
 
     type = 0;
+    names = NULL;
 
     if (bu("require", 7)) {
       is = i;
@@ -207,6 +246,9 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           // import \* as [^\s]+ from
           if (bc("from", 4)) {
             i += 4;
+
+            err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*");
+            assert(err == 0);
 
             goto from;
           }
@@ -249,7 +291,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
           i++;
 
-          err = bare_module_lexer__add_import(env, imports, il++, s, is, ss, se, type);
+          err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names);
           if (err < 0) goto err;
         }
       }
@@ -284,7 +326,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
             if (c(0) == ')') {
               i++;
 
-              err = bare_module_lexer__add_import(env, imports, il++, s, is, ss, se, type);
+              err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names);
               if (err < 0) goto err;
             }
           }
@@ -302,6 +344,9 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         // import [^\s]+ from
         if (bc("from", 4)) {
           i += 4;
+
+          err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default");
+          assert(err == 0);
 
           goto from;
         }
@@ -414,7 +459,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           if (c(0) == ')') {
             i++;
 
-            err = bare_module_lexer__add_import(env, imports, il++, s, is, ss, se, type);
+            err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names);
             if (err < 0) goto err;
           }
         }
@@ -466,7 +511,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       if (c(0) == '=') {
         i++;
 
-        err = bare_module_lexer__add_export(env, exports, el++, s, es, ss, se);
+        err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
         if (err < 0) goto err;
       }
     }
@@ -505,7 +550,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
             if (c(0) == '=') {
               i++;
 
-              err = bare_module_lexer__add_export(env, exports, el++, s, es, ss, se);
+              err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
               if (err < 0) goto err;
             }
           }
@@ -532,7 +577,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
         i++;
 
-        err = bare_module_lexer__add_import(env, imports, il++, s, is, ss, se, bare_module_lexer_import);
+        err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names);
         if (err < 0) goto err;
       }
     }
