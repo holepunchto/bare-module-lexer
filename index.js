@@ -12,6 +12,7 @@ module.exports = exports = function lex (input, encoding, opts = {}) {
 exports.constants = {
   REQUIRE: binding.REQUIRE,
   IMPORT: binding.IMPORT,
+  DYNAMIC: binding.DYNAMIC,
   ADDON: binding.ADDON,
   ASSET: binding.ASSET,
   REEXPORT: binding.REEXPORT

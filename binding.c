@@ -73,6 +73,7 @@ bare_module_lexer_exports (js_env_t *env, js_value_t *exports) {
 
   V("REQUIRE", bare_module_lexer_require)
   V("IMPORT", bare_module_lexer_import)
+  V("DYNAMIC", bare_module_lexer_dynamic)
   V("ADDON", bare_module_lexer_addon)
   V("ASSET", bare_module_lexer_asset)
   V("REEXPORT", bare_module_lexer_reexport)

@@ -1,7 +1,7 @@
 const test = require('brittle')
 const lex = require('.')
 
-const { REQUIRE, IMPORT, ADDON, ASSET, REEXPORT } = lex.constants
+const { REQUIRE, IMPORT, DYNAMIC, ADDON, ASSET, REEXPORT } = lex.constants
 
 test('require(\'id\')', (t) => {
   t.alike(lex('require(\'./foo.js\')'), {
@@ -164,30 +164,37 @@ test('module.exports["name"]', (t) => {
   })
 })
 
-test('import', (t) => {
+test('import \'id\'', (t) => {
   t.alike(lex('import \'./foo.js\''), {
     imports: [{ specifier: './foo.js', type: IMPORT, position: [0, 8, 16] }],
     exports: []
   })
 })
 
-test('import * as', (t) => {
+test('import * as from \'id\'', (t) => {
   t.alike(lex('import * as foo from \'./foo.js\''), {
     imports: [{ specifier: './foo.js', type: IMPORT, position: [0, 22, 30] }],
     exports: []
   })
 })
 
-test('import default', (t) => {
+test('import default from \'id\'', (t) => {
   t.alike(lex('import foo from \'./foo.js\''), {
     imports: [{ specifier: './foo.js', type: IMPORT, position: [0, 17, 25] }],
     exports: []
   })
 })
 
-test('import named', (t) => {
+test('import { name } from \'id\'', (t) => {
   t.alike(lex('import { foo } from \'./foo.js\''), {
     imports: [{ specifier: './foo.js', type: IMPORT, position: [0, 21, 29] }],
+    exports: []
+  })
+})
+
+test('import(\'id\')', (t) => {
+  t.alike(lex('import(\'./foo.js\')'), {
+    imports: [{ specifier: './foo.js', type: IMPORT | DYNAMIC, position: [0, 8, 16] }],
     exports: []
   })
 })
