@@ -32,15 +32,15 @@ test('require.addon("id")', (t) => {
 })
 
 test('require.asset(\'id\')', (t) => {
-  t.alike(lex('require.asset(\'./foo.bare\')'), {
-    imports: [{ specifier: './foo.bare', type: REQUIRE | ASSET }],
+  t.alike(lex('require.asset(\'./foo.txt\')'), {
+    imports: [{ specifier: './foo.txt', type: REQUIRE | ASSET }],
     exports: []
   })
 })
 
 test('require.asset("id")', (t) => {
-  t.alike(lex('require.asset("./foo.bare")'), {
-    imports: [{ specifier: './foo.bare', type: REQUIRE | ASSET }],
+  t.alike(lex('require.asset("./foo.txt")'), {
+    imports: [{ specifier: './foo.txt', type: REQUIRE | ASSET }],
     exports: []
   })
 })
@@ -76,6 +76,48 @@ test('exports = require', (t) => {
 test('module.exports = exports = require', (t) => {
   t.alike(lex('module.exports = exports = require(\'./foo.js\')'), {
     imports: [{ specifier: './foo.js', type: REQUIRE | REEXPORT }],
+    exports: []
+  })
+})
+
+test('module.exports = require.addon', (t) => {
+  t.alike(lex('module.exports = require.addon(\'./foo.bare\')'), {
+    imports: [{ specifier: './foo.bare', type: REQUIRE | ADDON | REEXPORT }],
+    exports: []
+  })
+})
+
+test('exports = require.addon', (t) => {
+  t.alike(lex('exports = require.addon(\'./foo.bare\')'), {
+    imports: [{ specifier: './foo.bare', type: REQUIRE | ADDON | REEXPORT }],
+    exports: []
+  })
+})
+
+test('module.exports = exports = require.addon', (t) => {
+  t.alike(lex('module.exports = exports = require.addon(\'./foo.bare\')'), {
+    imports: [{ specifier: './foo.bare', type: REQUIRE | ADDON | REEXPORT }],
+    exports: []
+  })
+})
+
+test('module.exports = require.asset', (t) => {
+  t.alike(lex('module.exports = require.asset(\'./foo.txt\')'), {
+    imports: [{ specifier: './foo.txt', type: REQUIRE | ASSET | REEXPORT }],
+    exports: []
+  })
+})
+
+test('exports = require.asset', (t) => {
+  t.alike(lex('exports = require.asset(\'./foo.txt\')'), {
+    imports: [{ specifier: './foo.txt', type: REQUIRE | ASSET | REEXPORT }],
+    exports: []
+  })
+})
+
+test('module.exports = exports = require.asset', (t) => {
+  t.alike(lex('module.exports = exports = require.asset(\'./foo.txt\')'), {
+    imports: [{ specifier: './foo.txt', type: REQUIRE | ASSET | REEXPORT }],
     exports: []
   })
 })
