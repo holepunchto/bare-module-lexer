@@ -204,11 +204,26 @@ test('/* require(\'id\') */', (t) => {
     imports: [],
     exports: []
   })
+
+  t.alike(lex('/* require(\'./foo.js\') */ require(\'./bar.js\')'), {
+    imports: [{ specifier: './bar.js', type: REQUIRE, names: [], position: [26, 35, 43] }],
+    exports: []
+  })
+
+  t.alike(lex('/* require(\'./foo.js\')\nrequire(\'./bar.js\') */ require(\'./baz.js\')'), {
+    imports: [{ specifier: './baz.js', type: REQUIRE, names: [], position: [46, 55, 63] }],
+    exports: []
+  })
 })
 
 test('// require(\'id\')', (t) => {
   t.alike(lex('// require(\'./foo.js\')'), {
     imports: [],
+    exports: []
+  })
+
+  t.alike(lex('// require(\'./foo.js\')\nrequire(\'./bar.js\')'), {
+    imports: [{ specifier: './bar.js', type: REQUIRE, names: [], position: [23, 32, 40] }],
     exports: []
   })
 })
