@@ -10,10 +10,33 @@ module.exports = exports = function lex (input, encoding, opts = {}) {
 }
 
 exports.constants = {
+  /**
+   * CommonJS `require()`.
+   */
   REQUIRE: binding.REQUIRE,
+
+  /**
+   * ES module `import`.
+   */
   IMPORT: binding.IMPORT,
+
+  /**
+   * ES module `import()` if `IMPORT` is set.
+   */
   DYNAMIC: binding.DYNAMIC,
+
+  /**
+   * CommonJS `require.addon()` if `REQUIRE` is set or ES module `import.meta.addon()` if `IMPORT` is set.
+   */
   ADDON: binding.ADDON,
+
+  /**
+   * CommonJS `require.asset()` if `REQUIRE` is set or ES module `import.meta.asset()` if `IMPORT` is set.
+   */
   ASSET: binding.ASSET,
+
+  /**
+   * Re-export of a CommonJS `require()` if `REQUIRE` is set.
+   */
   REEXPORT: binding.REEXPORT
 }
