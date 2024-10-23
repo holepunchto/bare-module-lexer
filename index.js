@@ -6,6 +6,10 @@ module.exports = exports = function lex (input, encoding, opts = {}) {
     encoding = null
   }
 
+  if (typeof input !== 'string' && !ArrayBuffer.isView(input)) {
+    throw new TypeError(`Input must be a string or buffer. Received type ${typeof input}`)
+  }
+
   return binding.lex(typeof input === 'string' ? Buffer.from(input, encoding) : input)
 }
 
