@@ -206,6 +206,23 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       continue;
     }
 
+    if (u(0) == '\'' || u(0) == '"' || u(0) == '`') {
+      utf8_t e = u(0);
+
+      i++;
+
+      while (i < n) {
+        if (u(0) == '\\' && c(1) == e) i += 2;
+        else if (u(0) != e) i++;
+        else break;
+      }
+
+      // import ['"].*['"]
+      if (c(0) == e) i++;
+
+      continue;
+    }
+
     type = 0;
     names = NULL;
 

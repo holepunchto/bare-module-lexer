@@ -233,10 +233,45 @@ test('invalid require', (t) => {
     imports: [],
     exports: []
   })
+
+  t.alike(lex('\'require(\\\'./foo.js\\\')\''), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('"require(\'./foo.js\')"'), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('`require(\'./foo.js\')`'), {
+    imports: [],
+    exports: []
+  })
 })
 
 test('invalid import', (t) => {
   t.alike(lex('imported from \'./foo.js\''), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('\'import\' \'./foo.js\''), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('\'import \\\'./foo.js\\\'\''), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('"import \'./foo.js\'"'), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('`import \'./foo.js\'`'), {
     imports: [],
     exports: []
   })
