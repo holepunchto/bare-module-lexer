@@ -217,7 +217,6 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         else break;
       }
 
-      // import ['"].*['"]
       if (c(0) == e) i++;
 
       continue;
