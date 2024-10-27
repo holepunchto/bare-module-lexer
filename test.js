@@ -227,3 +227,17 @@ test('// require(\'id\')', (t) => {
     exports: []
   })
 })
+
+test('invalid require', (t) => {
+  t.alike(lex('requires(\'./foo.js\')'), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('invalid import', (t) => {
+  t.alike(lex('imported from \'./foo.js\''), {
+    imports: [],
+    exports: []
+  })
+})
