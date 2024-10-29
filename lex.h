@@ -164,7 +164,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
   uint32_t nl; // Names count
 
 // Current character, unchecked
-#define u(offset) (s[i + offset])
+#define u(offset) ((uint8_t) s[i + offset])
 
 // Current character, checked
 #define c(offset) (i + offset < n ? u(offset) : -1)

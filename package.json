@@ -28,9 +28,15 @@
     "url": "https://github.com/holepunchto/bare-module-lexer/issues"
   },
   "homepage": "https://github.com/holepunchto/bare-module-lexer#readme",
+  "dependencies": {
+    "require-addon": "^1.0.2"
+  },
   "devDependencies": {
+    "bare-compat-napi": "^1.0.0",
     "brittle": "^3.1.1",
     "cmake-bare": "^1.1.7",
+    "cmake-napi": "^1.0.5",
+    "cmake-npm": "^1.0.2",
     "standard": "^17.0.0"
   }
 }
