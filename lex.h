@@ -47,7 +47,7 @@ bare_module_lexer__add_position (js_env_t *env, js_value_t *entry, size_t statem
 
 static inline int
 bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t *i, const utf8_t *source, size_t import_start, size_t specifier_start, size_t specifier_end, int type, js_value_t *names) {
-  assert(specifier_end > specifier_start);
+  assert(specifier_end >= specifier_start);
 
   int err;
 
@@ -89,7 +89,7 @@ bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t *i, 
 
 static inline int
 bare_module_lexer__add_export (js_env_t *env, js_value_t *exports, uint32_t *i, const utf8_t *source, size_t export_start, size_t name_start, size_t name_end) {
-  assert(name_end > name_start);
+  assert(name_end >= name_start);
 
   int err;
 
@@ -482,6 +482,14 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
             if (err < 0) goto err;
           }
         }
+      }
+
+      // require\.addon\(\)
+      else if (c(0) == ')' && (type & bare_module_lexer_addon)) {
+        ss = se = i++;
+
+        err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names);
+        if (err < 0) goto err;
       }
     }
 

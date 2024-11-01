@@ -17,6 +17,13 @@ test('require("id")', (t) => {
   })
 })
 
+test('require.addon()', (t) => {
+  t.alike(lex('require.addon()'), {
+    imports: [{ specifier: '', type: REQUIRE | ADDON, names: [], position: [0, 14, 14] }],
+    exports: []
+  })
+})
+
 test('require.addon(\'id\')', (t) => {
   t.alike(lex('require.addon(\'./foo.bare\')'), {
     imports: [{ specifier: './foo.bare', type: REQUIRE | ADDON, names: [], position: [0, 15, 25] }],
