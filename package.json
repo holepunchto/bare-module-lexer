@@ -1,6 +1,6 @@
 {
   "name": "bare-module-lexer",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Heuristic lexer for detecting imports and exports in JavaScript modules",
   "exports": {
     ".": "./index.js",
