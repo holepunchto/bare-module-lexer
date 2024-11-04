@@ -1,4 +1,4 @@
-const binding = require('./binding')
+const binding = require('#binding')
 
 module.exports = exports = function lex (input, encoding, opts = {}) {
   if (typeof encoding === 'object' && encoding !== null) {
