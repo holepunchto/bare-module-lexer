@@ -17,6 +17,26 @@ enum {
   bare_module_lexer_reexport = 0x20,
 };
 
+static inline bool
+bare_module_lexer__is_line_terminator (uint8_t c) {
+  return c == 0xa || c == 0xd;
+}
+
+static inline bool
+bare_module_lexer__is_whitespace (uint8_t c) {
+  return c == ' ' || c == '\t' || c == 0xb || c == 0xc || c == 0xa0 || bare_module_lexer__is_line_terminator(c);
+}
+
+static inline bool
+bare_module_lexer__is_id_start (uint8_t c) {
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '$';
+}
+
+static inline bool
+bare_module_lexer__is_id (uint8_t c) {
+  return bare_module_lexer__is_id_start(c) || (c >= '0' && c <= '9');
+}
+
 static inline int
 bare_module_lexer__add_position (js_env_t *env, js_value_t *entry, size_t statement_start, size_t input_start, size_t input_end) {
   int err;
@@ -169,17 +189,16 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 // Current character, checked
 #define c(offset) (i + offset < n ? u(offset) : -1)
 
-// Whitespace character
-#define ws(c) (c == ' ' || c == '\t' || c == 0xb || c == 0xc || c == 0xa0)
-
-// Line terminator
-#define lt(c) (c == 0xa || c == 0xd)
-
 // Begins with string, unchecked
 #define bu(t, l) (strncmp((const char *) &s[i], t, l) == 0)
 
 // Begins with string, checked
 #define bc(t, l) (i + l < n && bu(t, l))
+
+#define lt  bare_module_lexer__is_line_terminator
+#define ws  bare_module_lexer__is_whitespace
+#define ids bare_module_lexer__is_id_start
+#define id  bare_module_lexer__is_id
 
   while (i < n) {
     while (i < n && ws(u(0))) i++;
@@ -506,6 +525,31 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
       // exports = \{
       if (c(0) == '{') {
+        i++;
+
+        while (c(0) != '}') {
+          while (i < n && ws(u(0))) i++;
+
+          if (ids(c(0))) {
+            ss = i++;
+
+            while (id(c(0))) i++;
+
+            se = i;
+
+            err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+            if (err < 0) goto err;
+          }
+
+          while (i < n && ws(u(0))) i++;
+
+          if (c(0) != ',') break;
+
+          i++;
+        }
+
+        // exports = \{[^}]*\}
+        if (c(0) == '}') i++;
       }
 
       // exports = require
@@ -614,10 +658,12 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
 #undef u
 #undef c
-#undef ws
-#undef lt
 #undef bu
 #undef bc
+#undef lt
+#undef ws
+#undef ids
+#undef id
 
   return 0;
 

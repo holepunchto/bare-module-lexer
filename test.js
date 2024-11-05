@@ -171,6 +171,32 @@ test('module.exports["name"]', (t) => {
   })
 })
 
+test('module.exports = {}', (t) => {
+  t.alike(lex('module.exports = {}'), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('module.exports = { name }', (t) => {
+  t.alike(lex('module.exports = { foo }'), {
+    imports: [],
+    exports: [{ name: 'foo', position: [0, 19, 22] }]
+  })
+})
+
+test('module.exports = { name, name }', (t) => {
+  t.alike(lex('module.exports = { foo, bar }'), {
+    imports: [],
+    exports: [{ name: 'foo', position: [0, 19, 22] }, { name: 'bar', position: [0, 24, 27] }]
+  })
+
+  t.alike(lex('module.exports = { foo,\n bar }'), {
+    imports: [],
+    exports: [{ name: 'foo', position: [0, 19, 22] }, { name: 'bar', position: [0, 25, 28] }]
+  })
+})
+
 test('import \'id\'', (t) => {
   t.alike(lex('import \'./foo.js\''), {
     imports: [{ specifier: './foo.js', type: IMPORT, names: [], position: [0, 8, 16] }],
