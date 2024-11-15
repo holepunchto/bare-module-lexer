@@ -14,7 +14,8 @@ enum {
   bare_module_lexer_dynamic = 0x4,
   bare_module_lexer_addon = 0x8,
   bare_module_lexer_asset = 0x10,
-  bare_module_lexer_reexport = 0x20,
+  bare_module_lexer_resolve = 0x20,
+  bare_module_lexer_reexport = 0x40,
 };
 
 static inline bool
@@ -428,9 +429,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       while (i < n && ws(u(0))) i++;
     }
 
-    else {
-      i++;
-    }
+    else i++;
 
     continue;
 
@@ -456,6 +455,24 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           while (i < n && ws(u(0))) i++;
 
           type |= bare_module_lexer_addon;
+
+          // require\.addon\.
+          if (c(0) == '.') {
+            i++;
+
+            while (i < n && ws(u(0))) i++;
+
+            // require\.addon\.resolve
+            if (i + 7 < n && bu("resolve", 7)) {
+              i += 7;
+
+              while (i < n && ws(u(0))) i++;
+
+              type |= bare_module_lexer_resolve;
+            }
+
+            else continue;
+          }
         }
 
         // require\.asset
@@ -467,15 +484,26 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
           type |= bare_module_lexer_asset;
         }
       }
+
+      // require\.resolve
+      else if (i + 7 < n && bu("resolve", 7)) {
+        i += 7;
+
+        while (i < n && ws(u(0))) i++;
+
+        type |= bare_module_lexer_resolve;
+      }
+
+      else continue;
     }
 
-    // require(\.(addon|asset))?\(
+    // require(\.(resolve|addon(\.resolve)?|asset))?\(
     if (c(0) == '(') {
       i++;
 
       while (i < n && ws(u(0))) i++;
 
-      // require(\.(addon|asset))?\(['"]
+      // require(\.(resolve|addon(\.resolve)?|asset))?\(['"]
       if (c(0) == '\'' || c(0) == '"') {
         utf8_t e = u(0);
 
@@ -483,7 +511,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
         while (i < n && u(0) != e) i++;
 
-        // require(\.(addon|asset))?\(['"].*['"]
+        // require(\.(resolve|addon(\.resolve)?|asset))?\(['"].*['"]
         if (c(0) == e) {
           se = i;
 
@@ -493,7 +521,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
 
           while (i < n && u(0) != ')') i++;
 
-          // require(\.(addon|asset))?\(['"].*['"][^)]*\)
+          // require(\.(resolve|addon(\.resolve)?|asset))?\(['"].*['"][^)]*\)
           if (c(0) == ')') {
             i++;
 
@@ -503,7 +531,7 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
         }
       }
 
-      // require\.addon\(\)
+      // require\.addon(\.resolve)?\(\)
       else if (c(0) == ')' && (type & bare_module_lexer_addon)) {
         ss = se = i++;
 

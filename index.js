@@ -30,14 +30,20 @@ exports.constants = {
   DYNAMIC: binding.DYNAMIC,
 
   /**
-   * CommonJS `require.addon()` if `REQUIRE` is set or ES module `import.meta.addon()` if `IMPORT` is set.
+   * CommonJS `require.addon()` if `REQUIRE` is set, or ES module `import.meta.addon()` if `IMPORT` is set.
    */
   ADDON: binding.ADDON,
 
   /**
-   * CommonJS `require.asset()` if `REQUIRE` is set or ES module `import.meta.asset()` if `IMPORT` is set.
+   * CommonJS `require.asset()` if `REQUIRE` is set, or ES module `import.meta.asset()` if `IMPORT` is set.
    */
   ASSET: binding.ASSET,
+
+  /**
+   * CommonJS `require.resolve()` or `require.addon.resolve()` if `REQUIRE` and optionally `ADDON` are set, or ES module
+   * `import.meta.resolve()` or `import.meta.addon.resolve()` if `IMPORT` and optionally `ADDON` are set.
+   */
+  RESOLVE: binding.RESOLVE,
 
   /**
    * Re-export of a CommonJS `require()` if `REQUIRE` is set.

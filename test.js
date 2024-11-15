@@ -1,7 +1,7 @@
 const test = require('brittle')
 const lex = require('.')
 
-const { REQUIRE, IMPORT, DYNAMIC, ADDON, ASSET, REEXPORT } = lex.constants
+const { REQUIRE, IMPORT, DYNAMIC, ADDON, ASSET, REEXPORT, RESOLVE } = lex.constants
 
 test('require(\'id\')', (t) => {
   t.alike(lex('require(\'./foo.js\')'), {
@@ -13,6 +13,20 @@ test('require(\'id\')', (t) => {
 test('require("id")', (t) => {
   t.alike(lex('require("./foo.js")'), {
     imports: [{ specifier: './foo.js', type: REQUIRE, names: [], position: [0, 9, 17] }],
+    exports: []
+  })
+})
+
+test('require.resolve(\'id\')', (t) => {
+  t.alike(lex('require.resolve(\'./foo.js\')'), {
+    imports: [{ specifier: './foo.js', type: REQUIRE | RESOLVE, names: [], position: [0, 17, 25] }],
+    exports: []
+  })
+})
+
+test('require.resolve("id")', (t) => {
+  t.alike(lex('require.resolve("./foo.js")'), {
+    imports: [{ specifier: './foo.js', type: REQUIRE | RESOLVE, names: [], position: [0, 17, 25] }],
     exports: []
   })
 })
@@ -34,6 +48,27 @@ test('require.addon(\'id\')', (t) => {
 test('require.addon("id")', (t) => {
   t.alike(lex('require.addon("./foo.bare")'), {
     imports: [{ specifier: './foo.bare', type: REQUIRE | ADDON, names: [], position: [0, 15, 25] }],
+    exports: []
+  })
+})
+
+test('require.addon.resolve()', (t) => {
+  t.alike(lex('require.addon.resolve()'), {
+    imports: [{ specifier: '', type: REQUIRE | ADDON | RESOLVE, names: [], position: [0, 22, 22] }],
+    exports: []
+  })
+})
+
+test('require.addon.resolve(\'id\')', (t) => {
+  t.alike(lex('require.addon.resolve(\'./foo.bare\')'), {
+    imports: [{ specifier: './foo.bare', type: REQUIRE | ADDON | RESOLVE, names: [], position: [0, 23, 33] }],
+    exports: []
+  })
+})
+
+test('require.addon.resolve("id")', (t) => {
+  t.alike(lex('require.addon.resolve("./foo.bare")'), {
+    imports: [{ specifier: './foo.bare', type: REQUIRE | ADDON | RESOLVE, names: [], position: [0, 23, 33] }],
     exports: []
   })
 })
