@@ -6,7 +6,7 @@
 #include "lex.h"
 
 static js_value_t *
-bare_module_lexer_lex (js_env_t *env, js_callback_info_t *info) {
+bare_module_lexer_lex(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   size_t argc = 1;
@@ -47,7 +47,7 @@ bare_module_lexer_lex (js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
-bare_module_lexer_exports (js_env_t *env, js_value_t *exports) {
+bare_module_lexer_exports(js_env_t *env, js_value_t *exports) {
   int err;
 
 #define V(name, fn) \

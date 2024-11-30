@@ -1,16 +1,20 @@
 const binding = require('#binding')
 
-module.exports = exports = function lex (input, encoding, opts = {}) {
+module.exports = exports = function lex(input, encoding, opts = {}) {
   if (typeof encoding === 'object' && encoding !== null) {
     opts = encoding
     encoding = null
   }
 
   if (typeof input !== 'string' && !ArrayBuffer.isView(input)) {
-    throw new TypeError(`Input must be a string or buffer. Received type ${typeof input}`)
+    throw new TypeError(
+      `Input must be a string or buffer. Received type ${typeof input}`
+    )
   }
 
-  return binding.lex(typeof input === 'string' ? Buffer.from(input, encoding) : input)
+  return binding.lex(
+    typeof input === 'string' ? Buffer.from(input, encoding) : input
+  )
 }
 
 exports.constants = {
