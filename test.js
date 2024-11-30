@@ -92,6 +92,34 @@ test('require.addon("id")', (t) => {
   })
 })
 
+test("require.addon('id', __filename)", (t) => {
+  t.alike(lex("require.addon('./foo.bare', __filename)"), {
+    imports: [
+      {
+        specifier: './foo.bare',
+        type: REQUIRE | ADDON,
+        names: [],
+        position: [0, 15, 25]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('require.addon("id", __filename)', (t) => {
+  t.alike(lex('require.addon("./foo.bare", __filename)'), {
+    imports: [
+      {
+        specifier: './foo.bare',
+        type: REQUIRE | ADDON,
+        names: [],
+        position: [0, 15, 25]
+      }
+    ],
+    exports: []
+  })
+})
+
 test('require.addon.resolve()', (t) => {
   t.alike(lex('require.addon.resolve()'), {
     imports: [
