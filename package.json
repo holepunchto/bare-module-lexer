@@ -56,6 +56,6 @@
     "prettier-config-standard": "^7.0.0"
   },
   "peerDependencies": {
-    "bare-buffer": "^2.7.1"
+    "bare-buffer": "*"
   }
 }

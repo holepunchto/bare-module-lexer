@@ -8,7 +8,7 @@ declare function lex(
     specifier: string
     type: number
     names: string[]
-    positions: [
+    position: [
       importStart: number,
       specifierStart: number,
       specifierEnd: number
