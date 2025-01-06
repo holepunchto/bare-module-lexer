@@ -6,6 +6,12 @@
     ".": "./index.js",
     "./package": "./package.json"
   },
+  "imports": {
+    "#binding": {
+      "bare": "./binding/bare.js",
+      "node": "./binding/node.js"
+    }
+  },
   "files": [
     "index.js",
     "lex.h",
@@ -15,12 +21,6 @@
     "CMakeLists.txt",
     "prebuilds"
   ],
-  "imports": {
-    "#binding": {
-      "bare": "./binding/bare.js",
-      "node": "./binding/node.js"
-    }
-  },
   "addon": true,
   "scripts": {
     "test": "npm run lint && npm run test:bare && npm run test:node",
