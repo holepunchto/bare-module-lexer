@@ -1,8 +1,8 @@
-import Buffer from 'bare-buffer'
+import Buffer, { BufferEncoding } from 'bare-buffer'
 
 declare function lex(
   input: string | Buffer,
-  encoding?: Buffer.BufferEncoding
+  encoding?: BufferEncoding
 ): {
   imports: {
     specifier: string
