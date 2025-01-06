@@ -1,8 +1,8 @@
-type Buffer = unknown
+import Buffer from 'bare-buffer'
 
 declare function lex(
   input: string | Buffer,
-  encoding?: string
+  encoding?: Buffer.BufferEncoding
 ): {
   imports: {
     specifier: string
