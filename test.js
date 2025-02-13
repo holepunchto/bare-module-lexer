@@ -468,6 +468,48 @@ test("import('id')", (t) => {
   })
 })
 
+test("export * from 'id'", (t) => {
+  t.alike(lex("export * from './foo.js'"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT | REEXPORT,
+        names: ['*'],
+        position: [0, 15, 23]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("export * as from 'id'", (t) => {
+  t.alike(lex("export * as foo from './foo.js'"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT | REEXPORT,
+        names: ['*'],
+        position: [0, 22, 30]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("export { name } from 'id'", (t) => {
+  t.alike(lex("export { foo } from './foo.js'"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT | REEXPORT,
+        names: [],
+        position: [0, 21, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
 test("/* require('id') */", (t) => {
   t.alike(lex("/* require('./foo.js') */"), {
     imports: [],
