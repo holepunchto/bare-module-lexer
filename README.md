@@ -66,7 +66,7 @@ Options are reserved.
 | `ADDON`    | CommonJS `require.addon()` if `REQUIRE` is set, or ES module `import.meta.addon()` if `IMPORT` is set.                                                                                                                   |
 | `ASSET`    | CommonJS `require.asset()` if `REQUIRE` is set, or ES module `import.meta.asset()` if `IMPORT` is set.                                                                                                                   |
 | `RESOLVE`  | CommonJS `require.resolve()` or `require.addon.resolve()` if `REQUIRE` and optionally `ADDON` are set, or ES module `import.meta.resolve()` or `import.meta.addon.resolve()` if `IMPORT` and optionally `ADDON` are set. |
-| `REEXPORT` | Re-export of a CommonJS `require()` if `REQUIRE` is set.                                                                                                                                                                 |
+| `REEXPORT` | Re-export of a CommonJS `require()` if `REQUIRE` is set, or ES module `export from` if `IMPORT` is set.                                                                                                                  |
 
 ## License
 

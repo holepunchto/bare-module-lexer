@@ -19,27 +19,27 @@ enum {
 };
 
 static inline bool
-bare_module_lexer__is_line_terminator (uint8_t c) {
+bare_module_lexer__is_line_terminator(uint8_t c) {
   return c == 0xa || c == 0xd;
 }
 
 static inline bool
-bare_module_lexer__is_whitespace (uint8_t c) {
+bare_module_lexer__is_whitespace(uint8_t c) {
   return c == ' ' || c == '\t' || c == 0xb || c == 0xc || c == 0xa0 || bare_module_lexer__is_line_terminator(c);
 }
 
 static inline bool
-bare_module_lexer__is_id_start (uint8_t c) {
+bare_module_lexer__is_id_start(uint8_t c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '$';
 }
 
 static inline bool
-bare_module_lexer__is_id (uint8_t c) {
+bare_module_lexer__is_id(uint8_t c) {
   return bare_module_lexer__is_id_start(c) || (c >= '0' && c <= '9');
 }
 
 static inline int
-bare_module_lexer__add_position (js_env_t *env, js_value_t *entry, size_t statement_start, size_t input_start, size_t input_end) {
+bare_module_lexer__add_position(js_env_t *env, js_value_t *entry, size_t statement_start, size_t input_start, size_t input_end) {
   int err;
 
   js_value_t *position;
@@ -67,7 +67,7 @@ bare_module_lexer__add_position (js_env_t *env, js_value_t *entry, size_t statem
 }
 
 static inline int
-bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t *i, const utf8_t *source, size_t import_start, size_t specifier_start, size_t specifier_end, int type, js_value_t *names) {
+bare_module_lexer__add_import(js_env_t *env, js_value_t *imports, uint32_t *i, const utf8_t *source, size_t import_start, size_t specifier_start, size_t specifier_end, int type, js_value_t *names) {
   assert(specifier_end >= specifier_start);
 
   int err;
@@ -109,7 +109,7 @@ bare_module_lexer__add_import (js_env_t *env, js_value_t *imports, uint32_t *i, 
 }
 
 static inline int
-bare_module_lexer__add_export (js_env_t *env, js_value_t *exports, uint32_t *i, const utf8_t *source, size_t export_start, size_t name_start, size_t name_end) {
+bare_module_lexer__add_export(js_env_t *env, js_value_t *exports, uint32_t *i, const utf8_t *source, size_t export_start, size_t name_start, size_t name_end) {
   assert(name_end >= name_start);
 
   int err;
@@ -142,7 +142,7 @@ bare_module_lexer__add_export (js_env_t *env, js_value_t *exports, uint32_t *i, 
 }
 
 static inline int
-bare_module_lexer__add_name (js_env_t *env, js_value_t **names, uint32_t *i, const utf8_t *name) {
+bare_module_lexer__add_name(js_env_t *env, js_value_t **names, uint32_t *i, const utf8_t *name) {
   int err;
 
   if (*names == NULL) {
@@ -165,7 +165,7 @@ bare_module_lexer__add_name (js_env_t *env, js_value_t **names, uint32_t *i, con
 }
 
 static inline int
-bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports, const utf8_t *s, size_t n) {
+bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, const utf8_t *s, size_t n) {
   int err;
 
   size_t i = 0;
@@ -427,6 +427,76 @@ bare_module_lexer__lex (js_env_t *env, js_value_t *imports, js_value_t *exports,
       }
 
       while (i < n && ws(u(0))) i++;
+
+      // export \*
+      if (c(0) == '*') {
+        i++;
+
+        while (i < n && ws(u(0))) i++;
+
+        // export \* as
+        if (i + 3 < n && bu("as", 2) && ws(u(2))) {
+          i += 3;
+
+          while (i < n && ws(u(0))) i++;
+
+          // export \* as [^\s]+
+          while (i < n && !ws(u(0))) i++;
+
+          while (i < n && ws(u(0))) i++;
+
+          // export \* as [^\s]+ from
+          if (bc("from", 4)) {
+            type |= bare_module_lexer_import | bare_module_lexer_reexport;
+            is = es;
+
+            i += 4;
+
+            err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*");
+            assert(err == 0);
+
+            goto from;
+          }
+        }
+
+        // export \* from
+        else if (bc("from", 4)) {
+          type |= bare_module_lexer_import | bare_module_lexer_reexport;
+          is = es;
+
+          i += 4;
+
+          err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*");
+          assert(err == 0);
+
+          goto from;
+        }
+      }
+
+      // export {
+      else if (c(0) == '{') {
+        i++;
+
+        // export {[^}]*
+        while (i < n && u(0) != '}') i++;
+
+        // export {[^}]*}
+        if (c(0) == '}') {
+          i++;
+
+          while (i < n && ws(u(0))) i++;
+
+          // export {[^}]*} from
+          if (bc("from", 4)) {
+            type |= bare_module_lexer_import | bare_module_lexer_reexport;
+            is = es;
+
+            i += 4;
+
+            goto from;
+          }
+        }
+      }
     }
 
     else i++;
