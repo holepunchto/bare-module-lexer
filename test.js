@@ -563,6 +563,15 @@ test("// require('id')", (t) => {
   })
 })
 
+test("'\\\\'; require('id')", (t) => {
+  t.comment(lex("'\\\\'; require('./foo.js')"), {
+    imports: [
+      { specifier: './foo.js', type: REQUIRE, names: [], position: [6, 15, 23] }
+    ],
+    exports: []
+  })
+})
+
 test('invalid require', (t) => {
   t.alike(lex("requires('./foo.js')"), {
     imports: [],

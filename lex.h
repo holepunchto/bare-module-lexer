@@ -233,7 +233,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       while (i < n) {
         if (u(0) == '\\' && c(1) == e) i += 2;
-        else if (u(0) != e) i++;
+        else if (u(0) != e) i += 2;
         else break;
       }
 
