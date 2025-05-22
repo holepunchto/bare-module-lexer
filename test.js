@@ -510,6 +510,34 @@ test("export { name } from 'id'", (t) => {
   })
 })
 
+test("__export(require('id'))", (t) => {
+  t.alike(lex("__export(require('./foo.js'))"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE | REEXPORT,
+        names: [],
+        position: [9, 18, 26]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("__exportStar(require('id'))", (t) => {
+  t.alike(lex("__exportStar(require('./foo.js'))"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE | REEXPORT,
+        names: [],
+        position: [13, 22, 30]
+      }
+    ],
+    exports: []
+  })
+})
+
 test("/* require('id') */", (t) => {
   t.alike(lex("/* require('./foo.js') */"), {
     imports: [],

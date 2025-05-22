@@ -499,6 +499,28 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       }
     }
 
+    else if (bc("__export(require", 16)) {
+      es = i;
+      is = i + 9;
+
+      i += 16;
+
+      type |= bare_module_lexer_reexport;
+
+      goto require;
+    }
+
+    else if (bc("__exportStar(require", 20)) {
+      es = i;
+      is = i + 13;
+
+      i += 20;
+
+      type |= bare_module_lexer_reexport;
+
+      goto require;
+    }
+
     else i++;
 
     continue;
