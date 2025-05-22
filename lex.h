@@ -254,11 +254,10 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
     }
 
     else if (bu("import", 6)) {
+      type |= bare_module_lexer_import;
       is = i;
 
       i += 6;
-
-      type |= bare_module_lexer_import;
 
       while (i < n && ws(u(0))) i++;
 
@@ -517,11 +516,10 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
         // __export(Star)?\(require
         if (bc("require", 7)) {
+          type |= bare_module_lexer_reexport;
           is = i;
 
           i += 7;
-
-          type |= bare_module_lexer_reexport;
 
           goto require;
         }
@@ -681,11 +679,10 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       // exports = require
       else if (bc("require", 7)) {
+        type |= bare_module_lexer_reexport;
         is = i;
 
         i += 7;
-
-        type |= bare_module_lexer_reexport;
 
         goto require;
       }
