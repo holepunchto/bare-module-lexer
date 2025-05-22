@@ -204,7 +204,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
   while (i < n) {
     while (i < n && ws(u(0))) i++;
 
-    if (i + 7 >= n) break;
+    if (i + 8 >= n) break;
 
     if (bu("//", 2)) {
       i += 2;
@@ -254,11 +254,10 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
     }
 
     else if (bu("import", 6)) {
+      type |= bare_module_lexer_import;
       is = i;
 
       i += 6;
-
-      type |= bare_module_lexer_import;
 
       while (i < n && ws(u(0))) i++;
 
@@ -499,6 +498,34 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       }
     }
 
+    else if (bu("__export", 8)) {
+      es = i;
+
+      i += 8;
+
+      // __exportStar
+      if (bc("Star", 4)) i += 4;
+
+      while (i < n && ws(u(0))) i++;
+
+      // __export(Star)?\(
+      if (c(0) == '(') {
+        i++;
+
+        while (i < n && ws(u(0))) i++;
+
+        // __export(Star)?\(require
+        if (bc("require", 7)) {
+          type |= bare_module_lexer_reexport;
+          is = i;
+
+          i += 7;
+
+          goto require;
+        }
+      }
+    }
+
     else i++;
 
     continue;
@@ -652,11 +679,10 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       // exports = require
       else if (bc("require", 7)) {
+        type |= bare_module_lexer_reexport;
         is = i;
 
         i += 7;
-
-        type |= bare_module_lexer_reexport;
 
         goto require;
       }
