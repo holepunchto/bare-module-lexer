@@ -204,7 +204,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
   while (i < n) {
     while (i < n && ws(u(0))) i++;
 
-    if (i + 7 >= n) break;
+    if (i + 8 >= n) break;
 
     if (bu("//", 2)) {
       i += 2;
@@ -499,26 +499,33 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       }
     }
 
-    else if (bc("__export(require", 16)) {
+    else if (bu("__export", 8)) {
       es = i;
-      is = i + 9;
 
-      i += 16;
+      i += 8;
 
-      type |= bare_module_lexer_reexport;
+      // __exportStar
+      if (bc("Star", 4)) i += 4;
 
-      goto require;
-    }
+      while (i < n && ws(u(0))) i++;
 
-    else if (bc("__exportStar(require", 20)) {
-      es = i;
-      is = i + 13;
+      // __export(Star)?\(
+      if (c(0) == '(') {
+        i++;
 
-      i += 20;
+        while (i < n && ws(u(0))) i++;
 
-      type |= bare_module_lexer_reexport;
+        // __export(Star)?\(require
+        if (bc("require", 7)) {
+          is = i;
 
-      goto require;
+          i += 7;
+
+          type |= bare_module_lexer_reexport;
+
+          goto require;
+        }
+      }
     }
 
     else i++;
