@@ -4,6 +4,7 @@ interface Import {
   specifier: string
   type: number
   names: string[]
+  attributes: { [attribute: string]: string }
   position: [importStart: number, specifierStart: number, specifierEnd: number]
 }
 

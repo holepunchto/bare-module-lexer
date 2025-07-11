@@ -7,7 +7,13 @@ const { REQUIRE, IMPORT, DYNAMIC, ADDON, ASSET, REEXPORT, RESOLVE } =
 test("require('id')", (t) => {
   t.alike(lex("require('./foo.js')"), {
     imports: [
-      { specifier: './foo.js', type: REQUIRE, names: [], position: [0, 9, 17] }
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [0, 9, 17]
+      }
     ],
     exports: []
   })
@@ -16,7 +22,13 @@ test("require('id')", (t) => {
 test('require("id")', (t) => {
   t.alike(lex('require("./foo.js")'), {
     imports: [
-      { specifier: './foo.js', type: REQUIRE, names: [], position: [0, 9, 17] }
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [0, 9, 17]
+      }
     ],
     exports: []
   })
@@ -29,6 +41,7 @@ test("require.resolve('id')", (t) => {
         specifier: './foo.js',
         type: REQUIRE | RESOLVE,
         names: [],
+        attributes: {},
         position: [0, 17, 25]
       }
     ],
@@ -43,6 +56,7 @@ test('require.resolve("id")', (t) => {
         specifier: './foo.js',
         type: REQUIRE | RESOLVE,
         names: [],
+        attributes: {},
         position: [0, 17, 25]
       }
     ],
@@ -57,6 +71,7 @@ test('require.addon()', (t) => {
         specifier: '',
         type: REQUIRE | ADDON,
         names: [],
+        attributes: {},
         position: [0, 14, 14]
       }
     ],
@@ -71,6 +86,7 @@ test("require.addon('id')", (t) => {
         specifier: './foo.bare',
         type: REQUIRE | ADDON,
         names: [],
+        attributes: {},
         position: [0, 15, 25]
       }
     ],
@@ -85,6 +101,7 @@ test('require.addon("id")', (t) => {
         specifier: './foo.bare',
         type: REQUIRE | ADDON,
         names: [],
+        attributes: {},
         position: [0, 15, 25]
       }
     ],
@@ -99,6 +116,7 @@ test("require.addon('id', __filename)", (t) => {
         specifier: './foo.bare',
         type: REQUIRE | ADDON,
         names: [],
+        attributes: {},
         position: [0, 15, 25]
       }
     ],
@@ -113,6 +131,7 @@ test('require.addon("id", __filename)', (t) => {
         specifier: './foo.bare',
         type: REQUIRE | ADDON,
         names: [],
+        attributes: {},
         position: [0, 15, 25]
       }
     ],
@@ -127,6 +146,7 @@ test('require.addon.resolve()', (t) => {
         specifier: '',
         type: REQUIRE | ADDON | RESOLVE,
         names: [],
+        attributes: {},
         position: [0, 22, 22]
       }
     ],
@@ -141,6 +161,7 @@ test("require.addon.resolve('id')", (t) => {
         specifier: './foo.bare',
         type: REQUIRE | ADDON | RESOLVE,
         names: [],
+        attributes: {},
         position: [0, 23, 33]
       }
     ],
@@ -155,6 +176,7 @@ test('require.addon.resolve("id")', (t) => {
         specifier: './foo.bare',
         type: REQUIRE | ADDON | RESOLVE,
         names: [],
+        attributes: {},
         position: [0, 23, 33]
       }
     ],
@@ -169,6 +191,7 @@ test("require.asset('id')", (t) => {
         specifier: './foo.txt',
         type: REQUIRE | ASSET,
         names: [],
+        attributes: {},
         position: [0, 15, 24]
       }
     ],
@@ -183,6 +206,7 @@ test('require.asset("id")', (t) => {
         specifier: './foo.txt',
         type: REQUIRE | ASSET,
         names: [],
+        attributes: {},
         position: [0, 15, 24]
       }
     ],
@@ -193,19 +217,67 @@ test('require.asset("id")', (t) => {
 test("require('id', { with: { type: 'name' } })", (t) => {
   t.alike(lex("require('./foo.js', { with: { type: 'script' } })"), {
     imports: [
-      { specifier: './foo.js', type: REQUIRE, names: [], position: [0, 9, 17] }
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: { type: 'script' },
+        position: [0, 9, 17]
+      }
     ],
     exports: []
   })
+
+  t.alike(
+    lex(
+      "require('./foo.js', { with: { type: 'script', imports: './imports.json' } })"
+    ),
+    {
+      imports: [
+        {
+          specifier: './foo.js',
+          type: REQUIRE,
+          names: [],
+          attributes: { type: 'script', imports: './imports.json' },
+          position: [0, 9, 17]
+        }
+      ],
+      exports: []
+    }
+  )
 })
 
 test('require("id", { with: { type: "name" } })', (t) => {
   t.alike(lex('require("./foo.js", { with: { type: "script" } })'), {
     imports: [
-      { specifier: './foo.js', type: REQUIRE, names: [], position: [0, 9, 17] }
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: { type: 'script' },
+        position: [0, 9, 17]
+      }
     ],
     exports: []
   })
+
+  t.alike(
+    lex(
+      'require("./foo.js", { with: { type: "script", imports: "./imports.json" } })'
+    ),
+    {
+      imports: [
+        {
+          specifier: './foo.js',
+          type: REQUIRE,
+          names: [],
+          attributes: { type: 'script', imports: './imports.json' },
+          position: [0, 9, 17]
+        }
+      ],
+      exports: []
+    }
+  )
 })
 
 test('module.exports = require', (t) => {
@@ -215,6 +287,7 @@ test('module.exports = require', (t) => {
         specifier: './foo.js',
         type: REQUIRE | REEXPORT,
         names: [],
+        attributes: {},
         position: [17, 26, 34]
       }
     ],
@@ -229,6 +302,7 @@ test('exports = require', (t) => {
         specifier: './foo.js',
         type: REQUIRE | REEXPORT,
         names: [],
+        attributes: {},
         position: [10, 19, 27]
       }
     ],
@@ -243,6 +317,7 @@ test('module.exports = exports = require', (t) => {
         specifier: './foo.js',
         type: REQUIRE | REEXPORT,
         names: [],
+        attributes: {},
         position: [27, 36, 44]
       }
     ],
@@ -257,6 +332,7 @@ test('module.exports = require.addon', (t) => {
         specifier: './foo.bare',
         type: REQUIRE | ADDON | REEXPORT,
         names: [],
+        attributes: {},
         position: [17, 32, 42]
       }
     ],
@@ -271,6 +347,7 @@ test('exports = require.addon', (t) => {
         specifier: './foo.bare',
         type: REQUIRE | ADDON | REEXPORT,
         names: [],
+        attributes: {},
         position: [10, 25, 35]
       }
     ],
@@ -285,6 +362,7 @@ test('module.exports = exports = require.addon', (t) => {
         specifier: './foo.bare',
         type: REQUIRE | ADDON | REEXPORT,
         names: [],
+        attributes: {},
         position: [27, 42, 52]
       }
     ],
@@ -299,6 +377,7 @@ test('module.exports = require.asset', (t) => {
         specifier: './foo.txt',
         type: REQUIRE | ASSET | REEXPORT,
         names: [],
+        attributes: {},
         position: [17, 32, 41]
       }
     ],
@@ -313,6 +392,7 @@ test('exports = require.asset', (t) => {
         specifier: './foo.txt',
         type: REQUIRE | ASSET | REEXPORT,
         names: [],
+        attributes: {},
         position: [10, 25, 34]
       }
     ],
@@ -327,6 +407,7 @@ test('module.exports = exports = require.asset', (t) => {
         specifier: './foo.txt',
         type: REQUIRE | ASSET | REEXPORT,
         names: [],
+        attributes: {},
         position: [27, 42, 51]
       }
     ],
@@ -411,7 +492,13 @@ test('module.exports = { name, name }', (t) => {
 test("import 'id'", (t) => {
   t.alike(lex("import './foo.js'"), {
     imports: [
-      { specifier: './foo.js', type: IMPORT, names: [], position: [0, 8, 16] }
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: [],
+        attributes: {},
+        position: [0, 8, 16]
+      }
     ],
     exports: []
   })
@@ -424,6 +511,7 @@ test("import * as from 'id'", (t) => {
         specifier: './foo.js',
         type: IMPORT,
         names: ['*'],
+        attributes: {},
         position: [0, 22, 30]
       }
     ],
@@ -438,6 +526,7 @@ test("import default from 'id'", (t) => {
         specifier: './foo.js',
         type: IMPORT,
         names: ['default'],
+        attributes: {},
         position: [0, 17, 25]
       }
     ],
@@ -448,10 +537,49 @@ test("import default from 'id'", (t) => {
 test("import { name } from 'id'", (t) => {
   t.alike(lex("import { foo } from './foo.js'"), {
     imports: [
-      { specifier: './foo.js', type: IMPORT, names: [], position: [0, 21, 29] }
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: [],
+        attributes: {},
+        position: [0, 21, 29]
+      }
     ],
     exports: []
   })
+})
+
+test("import { name } from 'id' with { type: 'name' }", (t) => {
+  t.alike(lex("import { foo } from './foo.js' with { type: 'script' }"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: [],
+        attributes: { type: 'script' },
+        position: [0, 21, 29]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(
+    lex(
+      "import { foo } from './foo.js' with { type: 'script', imports: './imports.json' }"
+    ),
+    {
+      imports: [
+        {
+          specifier: './foo.js',
+          type: IMPORT,
+          names: [],
+          attributes: { type: 'script', imports: './imports.json' },
+          position: [0, 21, 29]
+        }
+      ],
+      exports: []
+    }
+  )
 })
 
 test("import('id')", (t) => {
@@ -461,6 +589,7 @@ test("import('id')", (t) => {
         specifier: './foo.js',
         type: IMPORT | DYNAMIC,
         names: [],
+        attributes: {},
         position: [0, 8, 16]
       }
     ],
@@ -475,6 +604,7 @@ test("export * from 'id'", (t) => {
         specifier: './foo.js',
         type: IMPORT | REEXPORT,
         names: ['*'],
+        attributes: {},
         position: [0, 15, 23]
       }
     ],
@@ -489,6 +619,7 @@ test("export * as from 'id'", (t) => {
         specifier: './foo.js',
         type: IMPORT | REEXPORT,
         names: ['*'],
+        attributes: {},
         position: [0, 22, 30]
       }
     ],
@@ -503,6 +634,7 @@ test("export { name } from 'id'", (t) => {
         specifier: './foo.js',
         type: IMPORT | REEXPORT,
         names: [],
+        attributes: {},
         position: [0, 21, 29]
       }
     ],
@@ -517,6 +649,7 @@ test("__export(require('id'))", (t) => {
         specifier: './foo.js',
         type: REQUIRE | REEXPORT,
         names: [],
+        attributes: {},
         position: [9, 18, 26]
       }
     ],
@@ -531,6 +664,7 @@ test("__exportStar(require('id'))", (t) => {
         specifier: './foo.js',
         type: REQUIRE | REEXPORT,
         names: [],
+        attributes: {},
         position: [13, 22, 30]
       }
     ],
@@ -550,6 +684,7 @@ test("/* require('id') */", (t) => {
         specifier: './bar.js',
         type: REQUIRE,
         names: [],
+        attributes: {},
         position: [26, 35, 43]
       }
     ],
@@ -564,6 +699,7 @@ test("/* require('id') */", (t) => {
           specifier: './baz.js',
           type: REQUIRE,
           names: [],
+          attributes: {},
           position: [46, 55, 63]
         }
       ],
@@ -584,6 +720,7 @@ test("// require('id')", (t) => {
         specifier: './bar.js',
         type: REQUIRE,
         names: [],
+        attributes: {},
         position: [23, 32, 40]
       }
     ],
@@ -594,7 +731,13 @@ test("// require('id')", (t) => {
 test("'\\\\'; require('id')", (t) => {
   t.alike(lex("'\\\\'; require('./foo.js')"), {
     imports: [
-      { specifier: './foo.js', type: REQUIRE, names: [], position: [6, 15, 23] }
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [6, 15, 23]
+      }
     ],
     exports: []
   })
