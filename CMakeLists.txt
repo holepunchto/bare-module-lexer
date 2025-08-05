@@ -22,6 +22,12 @@ target_sources(
     binding.c
 )
 
+target_compile_definitions(
+  ${bare_module_lexer_napi}
+  PRIVATE
+    NAPI_VERSION=9
+)
+
 resolve_node_module(bare-compat-napi compat)
 
 target_include_directories(
