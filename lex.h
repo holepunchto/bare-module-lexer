@@ -213,6 +213,43 @@ bare_module_lexer__add_attribute(js_env_t *env, js_value_t **attributes, const u
 #define id  bare_module_lexer__is_id
 
 static inline int
+bare_module_lexer__lex_regex(js_env_t *env, const utf8_t *s, size_t n, size_t i, size_t *result) {
+  i++;
+
+  bool in_character_class = false;
+
+  while (i < n) {
+    if (in_character_class) {
+      if (u(0) == ']') {
+        in_character_class = false;
+      } else if (c(0) == '\\') {
+        i += 2;
+      }
+    } else {
+      if (u(0) == '/') {
+        i++;
+
+        while (i < n && u(0) >= 'a' && u(0) <= 'z') i++;
+
+        *result = i;
+
+        return 0;
+      } else if (u(0) == '[') {
+        in_character_class = true;
+      } else if (u(0) == '\\') {
+        i += 2;
+      } else if (u(0) == ';' || lt(0)) {
+        return -1;
+      }
+    }
+
+    i++;
+  }
+
+  return -1;
+}
+
+static inline int
 bare_module_lexer__lex_import_attributes(js_env_t *env, js_value_t **attributes, const utf8_t *s, size_t n, size_t i, size_t *result) {
   int err;
 
@@ -324,7 +361,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       while (i + 1 < n && !bu("*/", 2)) i++;
 
-      if (bc("/*", 2)) i += 2;
+      if (bc("*/", 2)) i += 2;
 
       continue;
     }
@@ -341,6 +378,13 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       }
 
       if (c(0) == e) i++;
+
+      continue;
+    }
+
+    if (u(0) == '/') {
+      err = bare_module_lexer__lex_regex(env, s, n, i, &i);
+      if (err < 0) i++;
 
       continue;
     }

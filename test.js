@@ -743,6 +743,99 @@ test("'\\\\'; require('id')", (t) => {
   })
 })
 
+test("/regex/; require('id')", (t) => {
+  t.alike(lex("/'/; require('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [5, 14, 22]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("/'/g; require('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [6, 15, 23]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("/[/]/; require('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [7, 16, 24]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("/\\\\/; require('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [6, 15, 23]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("/[/]/g\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [7, 16, 24]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("1 / 2; require('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [7, 16, 24]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("1 / 2 / 3; require('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [11, 20, 28]
+      }
+    ],
+    exports: []
+  })
+})
+
 test('invalid require', (t) => {
   t.alike(lex("requires('./foo.js')"), {
     imports: [],
