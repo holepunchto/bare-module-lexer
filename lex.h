@@ -238,7 +238,7 @@ bare_module_lexer__lex_regex(js_env_t *env, const utf8_t *s, size_t n, size_t i,
         in_character_class = true;
       } else if (u(0) == '\\') {
         i += 2;
-      } else if (u(0) == ';' || lt(0)) {
+      } else if (u(0) == ';' || lt(u(0))) {
         return -1;
       }
     }

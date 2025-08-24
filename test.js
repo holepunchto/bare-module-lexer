@@ -836,6 +836,21 @@ test("/regex/; require('id')", (t) => {
   })
 })
 
+test("#!/shebang require('id')", (t) => {
+  t.alike(lex("#!/usr/bin/env bare\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [20, 29, 37]
+      }
+    ],
+    exports: []
+  })
+})
+
 test('invalid require', (t) => {
   t.alike(lex("requires('./foo.js')"), {
     imports: [],
