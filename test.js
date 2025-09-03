@@ -582,6 +582,21 @@ test("import { name } from 'id' with { type: 'name' }", (t) => {
   )
 })
 
+test("import default, { name } from 'id'", (t) => {
+  t.alike(lex("import foo, { bar } from './foo.js'"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: ['default'],
+        attributes: {},
+        position: [0, 26, 34]
+      }
+    ],
+    exports: []
+  })
+})
+
 test("import('id')", (t) => {
   t.alike(lex("import('./foo.js')"), {
     imports: [
@@ -896,21 +911,6 @@ test('invalid import', (t) => {
 
   t.alike(lex("`import './foo.js'`"), {
     imports: [],
-    exports: []
-  })
-})
-
-test("import default from 'id'", (t) => {
-  t.alike(lex("import a, { b } from './foo.js'"), {
-    imports: [
-      {
-        specifier: './foo.js',
-        type: IMPORT,
-        names: ['default', 'b'],
-        attributes: {},
-        position: [0, 22, 30]
-      }
-    ],
     exports: []
   })
 })
