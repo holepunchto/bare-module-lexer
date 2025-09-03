@@ -582,6 +582,21 @@ test("import { name } from 'id' with { type: 'name' }", (t) => {
   )
 })
 
+test.skip("import default, { name } from 'id'", (t) => {
+  t.alike(lex("import foo, { bar } from './foo.js'"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: ['default'],
+        attributes: {},
+        position: [0, 26, 34]
+      }
+    ],
+    exports: []
+  })
+})
+
 test("import('id')", (t) => {
   t.alike(lex("import('./foo.js')"), {
     imports: [
