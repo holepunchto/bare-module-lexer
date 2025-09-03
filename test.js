@@ -899,3 +899,18 @@ test('invalid import', (t) => {
     exports: []
   })
 })
+
+test("import default from 'id'", (t) => {
+  t.alike(lex("import a, { b } from './foo.js'"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: ['default', 'b'],
+        attributes: {},
+        position: [0, 22, 30]
+      }
+    ],
+    exports: []
+  })
+})
