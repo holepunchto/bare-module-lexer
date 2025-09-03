@@ -520,13 +520,13 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       else if (ws(c(-1))) {
         size_t j = i;
 
-        while (i < n && !ws(u(0))) i++;
+        // import [^\s,]+
+        while (i < n && !ws(u(0)) && u(0) != ',') i++;
 
-        // import [^\s]+
         if (j < i) {
           while (i < n && ws(u(0))) i++;
 
-          // import [^\s]+ from
+          // import [^\s,]+ from
           if (bc("from", 4)) {
             i += 4;
 
@@ -534,6 +534,38 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
             assert(err == 0);
 
             goto from;
+          }
+
+          // import [^\s,]+,
+          else if (c(0) == ',') {
+            i++;
+
+            while (i < n && ws(u(0))) i++;
+
+            // import [^\s,]+, {
+            if (c(0) == '{') {
+              i++;
+
+              // import [^\s,]+, {[^}]*
+              while (i < n && u(0) != '}') i++;
+
+              // import [^\s,]+, {[^}]*}
+              if (c(0) == '}') {
+                i++;
+
+                while (i < n && ws(u(0))) i++;
+
+                // import [^\s,]+, {[^}]*} from
+                if (bc("from", 4)) {
+                  i += 4;
+
+                  err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
+                  assert(err == 0);
+
+                  goto from;
+                }
+              }
+            }
           }
         }
       }
