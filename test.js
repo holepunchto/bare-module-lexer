@@ -913,4 +913,9 @@ test('invalid import', (t) => {
     imports: [],
     exports: []
   })
+
+  t.alike(lex(`/[\\\\]'/; 'import "./foo.js"'`), {
+    imports: [],
+    exports: []
+  })
 })

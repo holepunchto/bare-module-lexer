@@ -223,24 +223,22 @@ bare_module_lexer__lex_regex(js_env_t *env, const utf8_t *s, size_t n, size_t i,
       if (u(0) == ']') {
         in_character_class = false;
       } else if (c(0) == '\\') {
-        i += 2;
-      }
-    } else {
-      if (u(0) == '/') {
         i++;
-
-        while (i < n && u(0) >= 'a' && u(0) <= 'z') i++;
-
-        *result = i;
-
-        return 0;
-      } else if (u(0) == '[') {
-        in_character_class = true;
-      } else if (u(0) == '\\') {
-        i += 2;
-      } else if (u(0) == ';' || lt(u(0))) {
-        return -1;
       }
+    } else if (u(0) == '/') {
+      i++;
+
+      while (i < n && u(0) >= 'a' && u(0) <= 'z') i++;
+
+      *result = i;
+
+      return 0;
+    } else if (u(0) == '[') {
+      in_character_class = true;
+    } else if (u(0) == '\\') {
+      i++;
+    } else if (u(0) == ';' || lt(u(0))) {
+      return -1;
     }
 
     i++;
