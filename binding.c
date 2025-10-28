@@ -3,7 +3,7 @@
 #include <js.h>
 #include <uv.h>
 
-#include "lex.h"
+#include "lib/lex.h"
 
 static js_value_t *
 bare_module_lexer_lex(js_env_t *env, js_callback_info_t *info) {

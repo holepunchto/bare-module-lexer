@@ -11,18 +11,16 @@
   },
   "imports": {
     "#binding": {
-      "bare": "./binding/bare.js",
-      "node": "./binding/node.js"
+      "bare": "./lib/binding/bare.js",
+      "node": "./lib/binding/node.js"
     }
   },
   "files": [
     "index.js",
     "index.d.ts",
-    "lex.h",
     "binding.c",
-    "binding/bare.js",
-    "binding/node.js",
     "CMakeLists.txt",
+    "lib",
     "prebuilds"
   ],
   "addon": true,
