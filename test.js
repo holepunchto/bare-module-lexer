@@ -612,6 +612,185 @@ test("import('id')", (t) => {
   })
 })
 
+test("import.meta.resolve('id')", (t) => {
+  t.alike(lex("import.meta.resolve('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT | RESOLVE,
+        names: [],
+        attributes: {},
+        position: [0, 21, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('import.meta.resolve("id")', (t) => {
+  t.alike(lex('import.meta.resolve("./foo.js")'), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT | RESOLVE,
+        names: [],
+        attributes: {},
+        position: [0, 21, 29]
+      }
+    ],
+    exports: []
+  })
+})
+test('import.meta.addon()', (t) => {
+  t.alike(lex('import.meta.addon()'), {
+    imports: [
+      {
+        specifier: '',
+        type: IMPORT | ADDON,
+        names: [],
+        attributes: {},
+        position: [0, 18, 18]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("import.meta.addon('id')", (t) => {
+  t.alike(lex("import.meta.addon('./foo.bare')"), {
+    imports: [
+      {
+        specifier: './foo.bare',
+        type: IMPORT | ADDON,
+        names: [],
+        attributes: {},
+        position: [0, 19, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('import.meta.addon("id")', (t) => {
+  t.alike(lex('import.meta.addon("./foo.bare")'), {
+    imports: [
+      {
+        specifier: './foo.bare',
+        type: IMPORT | ADDON,
+        names: [],
+        attributes: {},
+        position: [0, 19, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("import.meta.addon('id', __filename)", (t) => {
+  t.alike(lex("import.meta.addon('./foo.bare', __filename)"), {
+    imports: [
+      {
+        specifier: './foo.bare',
+        type: IMPORT | ADDON,
+        names: [],
+        attributes: {},
+        position: [0, 19, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('import.meta.addon("id", __filename)', (t) => {
+  t.alike(lex('import.meta.addon("./foo.bare", __filename)'), {
+    imports: [
+      {
+        specifier: './foo.bare',
+        type: IMPORT | ADDON,
+        names: [],
+        attributes: {},
+        position: [0, 19, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('import.meta.addon.resolve()', (t) => {
+  t.alike(lex('import.meta.addon.resolve()'), {
+    imports: [
+      {
+        specifier: '',
+        type: IMPORT | ADDON | RESOLVE,
+        names: [],
+        attributes: {},
+        position: [0, 26, 26]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("import.meta.addon.resolve('id')", (t) => {
+  t.alike(lex("import.meta.addon.resolve('./foo.bare')"), {
+    imports: [
+      {
+        specifier: './foo.bare',
+        type: IMPORT | ADDON | RESOLVE,
+        names: [],
+        attributes: {},
+        position: [0, 27, 37]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('import.meta.addon.resolve("id")', (t) => {
+  t.alike(lex('import.meta.addon.resolve("./foo.bare")'), {
+    imports: [
+      {
+        specifier: './foo.bare',
+        type: IMPORT | ADDON | RESOLVE,
+        names: [],
+        attributes: {},
+        position: [0, 27, 37]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("import.meta.asset('id')", (t) => {
+  t.alike(lex("import.meta.asset('./foo.txt')"), {
+    imports: [
+      {
+        specifier: './foo.txt',
+        type: IMPORT | ASSET,
+        names: [],
+        attributes: {},
+        position: [0, 19, 28]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('import.meta.asset("id")', (t) => {
+  t.alike(lex('import.meta.asset("./foo.txt")'), {
+    imports: [
+      {
+        specifier: './foo.txt',
+        type: IMPORT | ASSET,
+        names: [],
+        attributes: {},
+        position: [0, 19, 28]
+      }
+    ],
+    exports: []
+  })
+})
+
 test("export * from 'id'", (t) => {
   t.alike(lex("export * from './foo.js'"), {
     imports: [

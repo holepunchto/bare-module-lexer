@@ -514,6 +514,118 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
         }
       }
 
+      // import\.
+      else if (c(0) == '.') {
+        i++;
+
+        while (i < n && ws(u(0))) i++;
+
+        // import\.meta
+        if (bc("meta", 4)) {
+          i += 4;
+
+          while (i < n && ws(u(0))) i++;
+
+          // import\.meta\.
+          if (c(0) == '.') {
+            i++;
+
+            // import\.meta\.a
+            if (i + 5 < n && u(0) == 'a') {
+              i++;
+
+              // import\.meta\.addon
+              if (bu("ddon", 4)) {
+                i += 4;
+
+                while (i < n && ws(u(0))) i++;
+
+                type |= bare_module_lexer_addon;
+
+                // import\.meta\.addon\.
+                if (c(0) == '.') {
+                  i++;
+
+                  while (i < n && ws(u(0))) i++;
+
+                  // import\.meta\.addon\.resolve
+                  if (i + 7 < n && bu("resolve", 7)) {
+                    i += 7;
+
+                    while (i < n && ws(u(0))) i++;
+
+                    type |= bare_module_lexer_resolve;
+                  }
+
+                  else continue;
+                }
+              }
+
+              // import\.meta\.asset
+              else if (bu("sset", 4)) {
+                i += 4;
+
+                while (i < n && ws(u(0))) i++;
+
+                type |= bare_module_lexer_asset;
+              }
+            }
+
+            // import\.meta\.resolve
+            else if (i + 7 < n && bu("resolve", 7)) {
+              i += 7;
+
+              while (i < n && ws(u(0))) i++;
+
+              type |= bare_module_lexer_resolve;
+            }
+
+            else continue;
+
+            // import\.meta\.(resolve|addon(\.resolve)?|asset)\(
+            if (c(0) == '(') {
+              i++;
+
+              while (i < n && ws(u(0))) i++;
+
+              // import\.meta\.(resolve|addon(\.resolve)?|asset)\(['"]
+              if (c(0) == '\'' || c(0) == '"') {
+                utf8_t e = u(0);
+
+                ss = ++i;
+
+                while (i < n && u(0) != e) i++;
+
+                // import\.meta\.(resolve|addon(\.resolve)?|asset)\(['"].*['"]
+                if (c(0) == e) {
+                  se = i;
+
+                  i++;
+
+                  while (i < n && u(0) != ')') i++;
+
+                  // import\.meta\.(resolve|addon(\.resolve)?|asset)\(['"].*['"][^)]*\)
+                  if (c(0) == ')') {
+                    i++;
+
+                    err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+                    if (err < 0) goto err;
+                  }
+                }
+              }
+
+              // import\.meta\.addon(\.resolve)?\(\)
+              else if (c(0) == ')' && (type & bare_module_lexer_addon)) {
+                ss = se = i++;
+
+                err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+                if (err < 0) goto err;
+              }
+            }
+          }
+        }
+      }
+
       // import\s
       else if (ws(c(-1))) {
         size_t j = i;
