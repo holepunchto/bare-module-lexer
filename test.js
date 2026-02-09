@@ -1,8 +1,7 @@
 const test = require('brittle')
 const lex = require('.')
 
-const { REQUIRE, IMPORT, DYNAMIC, ADDON, ASSET, REEXPORT, RESOLVE } =
-  lex.constants
+const { REQUIRE, IMPORT, DYNAMIC, ADDON, ASSET, REEXPORT, RESOLVE } = lex.constants
 
 test("require('id')", (t) => {
   t.alike(lex("require('./foo.js')"), {
@@ -228,23 +227,18 @@ test("require('id', { with: { type: 'name' } })", (t) => {
     exports: []
   })
 
-  t.alike(
-    lex(
-      "require('./foo.js', { with: { type: 'script', imports: './imports.json' } })"
-    ),
-    {
-      imports: [
-        {
-          specifier: './foo.js',
-          type: REQUIRE,
-          names: [],
-          attributes: { type: 'script', imports: './imports.json' },
-          position: [0, 9, 17]
-        }
-      ],
-      exports: []
-    }
-  )
+  t.alike(lex("require('./foo.js', { with: { type: 'script', imports: './imports.json' } })"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: { type: 'script', imports: './imports.json' },
+        position: [0, 9, 17]
+      }
+    ],
+    exports: []
+  })
 })
 
 test('require("id", { with: { type: "name" } })', (t) => {
@@ -261,23 +255,18 @@ test('require("id", { with: { type: "name" } })', (t) => {
     exports: []
   })
 
-  t.alike(
-    lex(
-      'require("./foo.js", { with: { type: "script", imports: "./imports.json" } })'
-    ),
-    {
-      imports: [
-        {
-          specifier: './foo.js',
-          type: REQUIRE,
-          names: [],
-          attributes: { type: 'script', imports: './imports.json' },
-          position: [0, 9, 17]
-        }
-      ],
-      exports: []
-    }
-  )
+  t.alike(lex('require("./foo.js", { with: { type: "script", imports: "./imports.json" } })'), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: { type: 'script', imports: './imports.json' },
+        position: [0, 9, 17]
+      }
+    ],
+    exports: []
+  })
 })
 
 test('module.exports = require', (t) => {
@@ -564,9 +553,7 @@ test("import { name } from 'id' with { type: 'name' }", (t) => {
   })
 
   t.alike(
-    lex(
-      "import { foo } from './foo.js' with { type: 'script', imports: './imports.json' }"
-    ),
+    lex("import { foo } from './foo.js' with { type: 'script', imports: './imports.json' }"),
     {
       imports: [
         {
@@ -885,21 +872,18 @@ test("/* require('id') */", (t) => {
     exports: []
   })
 
-  t.alike(
-    lex("/* require('./foo.js')\nrequire('./bar.js') */ require('./baz.js')"),
-    {
-      imports: [
-        {
-          specifier: './baz.js',
-          type: REQUIRE,
-          names: [],
-          attributes: {},
-          position: [46, 55, 63]
-        }
-      ],
-      exports: []
-    }
-  )
+  t.alike(lex("/* require('./foo.js')\nrequire('./bar.js') */ require('./baz.js')"), {
+    imports: [
+      {
+        specifier: './baz.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [46, 55, 63]
+      }
+    ],
+    exports: []
+  })
 })
 
 test("// require('id')", (t) => {
