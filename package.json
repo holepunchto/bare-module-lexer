@@ -51,7 +51,7 @@
     "cmake-napi": "^1.0.5",
     "cmake-npm": "^1.0.2",
     "prettier": "^3.4.1",
-    "prettier-config-standard": "^7.0.0"
+    "prettier-config-holepunch": "^2.0.0"
   },
   "peerDependencies": {
     "bare-buffer": "*"
