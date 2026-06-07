@@ -478,6 +478,72 @@ test('module.exports = { name, name }', (t) => {
   })
 })
 
+test('export const name', (t) => {
+  t.alike(lex('export const foo = 42'), {
+    imports: [],
+    exports: [{ name: 'foo', position: [0, 13, 16] }]
+  })
+})
+
+test('export let name', (t) => {
+  t.alike(lex('export let foo = 42'), {
+    imports: [],
+    exports: [{ name: 'foo', position: [0, 11, 14] }]
+  })
+})
+
+test('export var name', (t) => {
+  t.alike(lex('export var foo = 42'), {
+    imports: [],
+    exports: [{ name: 'foo', position: [0, 11, 14] }]
+  })
+})
+
+test('export function name () {}', (t) => {
+  t.alike(lex('export function foo () {}'), {
+    imports: [],
+    exports: [{ name: 'foo', position: [0, 16, 19] }]
+  })
+})
+
+test('export class Name {}', (t) => {
+  t.alike(lex('export class Foo {}'), {
+    imports: [],
+    exports: [{ name: 'Foo', position: [0, 13, 16] }]
+  })
+})
+
+test('export default value', (t) => {
+  t.alike(lex('export default 42'), {
+    imports: [],
+    exports: [{ name: 'default', position: [0, 7, 14] }]
+  })
+})
+
+test('export { name }', (t) => {
+  t.alike(lex('export { foo }'), {
+    imports: [],
+    exports: [{ name: 'foo', position: [0, 9, 12] }]
+  })
+})
+
+test('export { name, name }', (t) => {
+  t.alike(lex('export { foo, bar }'), {
+    imports: [],
+    exports: [
+      { name: 'foo', position: [0, 9, 12] },
+      { name: 'bar', position: [0, 14, 17] }
+    ]
+  })
+})
+
+test('export { name as name }', (t) => {
+  t.alike(lex('export { foo as bar }'), {
+    imports: [],
+    exports: [{ name: 'bar', position: [0, 16, 19] }]
+  })
+})
+
 test("import 'id'", (t) => {
   t.alike(lex("import './foo.js'"), {
     imports: [
@@ -529,9 +595,24 @@ test("import { name } from 'id'", (t) => {
       {
         specifier: './foo.js',
         type: IMPORT,
-        names: [],
+        names: ['foo'],
         attributes: {},
         position: [0, 21, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("import { name, name as name } from 'id'", (t) => {
+  t.alike(lex("import { foo, bar as baz } from './foo.js'"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: ['foo', 'bar'],
+        attributes: {},
+        position: [0, 33, 41]
       }
     ],
     exports: []
@@ -544,7 +625,7 @@ test("import { name } from 'id' with { type: 'name' }", (t) => {
       {
         specifier: './foo.js',
         type: IMPORT,
-        names: [],
+        names: ['foo'],
         attributes: { type: 'script' },
         position: [0, 21, 29]
       }
@@ -559,7 +640,7 @@ test("import { name } from 'id' with { type: 'name' }", (t) => {
         {
           specifier: './foo.js',
           type: IMPORT,
-          names: [],
+          names: ['foo'],
           attributes: { type: 'script', imports: './imports.json' },
           position: [0, 21, 29]
         }
@@ -575,9 +656,24 @@ test("import default, { name } from 'id'", (t) => {
       {
         specifier: './foo.js',
         type: IMPORT,
-        names: ['default'],
+        names: ['default', 'bar'],
         attributes: {},
         position: [0, 26, 34]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("import default, { name, name as name } from 'id'", (t) => {
+  t.alike(lex("import foo, { bar, baz as qux } from './foo.js'"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: ['default', 'bar', 'baz'],
+        attributes: {},
+        position: [0, 38, 46]
       }
     ],
     exports: []
@@ -814,9 +910,24 @@ test("export { name } from 'id'", (t) => {
       {
         specifier: './foo.js',
         type: IMPORT | REEXPORT,
-        names: [],
+        names: ['foo'],
         attributes: {},
         position: [0, 21, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("export { name, name as name } from 'id'", (t) => {
+  t.alike(lex("export { foo, bar as baz } from './foo.js'"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT | REEXPORT,
+        names: ['foo', 'bar'],
+        attributes: {},
+        position: [0, 33, 41]
       }
     ],
     exports: []
