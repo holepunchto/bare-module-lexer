@@ -318,6 +318,61 @@ bare_module_lexer__lex_import_attributes(js_env_t *env, js_value_t **attributes,
 }
 
 static inline int
+bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t *nl, const utf8_t *s, size_t n, size_t i, size_t *result) {
+  int err;
+
+  size_t ns; // Name start
+  size_t ne; // Name end
+
+  while (i < n && ws(u(0))) i++;
+
+  if (c(0) == '{') {
+    i++;
+
+    while (c(0) != '}') {
+      while (i < n && ws(u(0))) i++;
+
+      if (!ids(c(0))) break;
+
+      ns = i++;
+
+      while (id(c(0))) i++;
+
+      ne = i;
+
+      err = bare_module_lexer__add_name(env, names, nl, &s[ns], ne - ns);
+      assert(err == 0);
+
+      while (i < n && ws(u(0))) i++;
+
+      // [name] as
+      if (i + 3 < n && bu("as", 2) && ws(u(2))) {
+        i += 3;
+
+        while (i < n && ws(u(0))) i++;
+
+        // [name] as [alias]
+        while (id(c(0))) i++;
+
+        while (i < n && ws(u(0))) i++;
+      }
+
+      if (c(0) != ',') break;
+
+      i++;
+    }
+
+    while (i < n && u(0) != '}') i++;
+
+    if (c(0) == '}') i++;
+  }
+
+  *result = i;
+
+  return 0;
+}
+
+static inline int
 bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, const utf8_t *s, size_t n) {
   int err;
 
@@ -438,23 +493,16 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       // import {
       else if (c(0) == '{') {
-        i++;
+        err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i);
+        if (err < 0) goto err;
 
-        // import {[^}]*
-        while (i < n && u(0) != '}') i++;
+        while (i < n && ws(u(0))) i++;
 
-        // import {[^}]*}
-        if (c(0) == '}') {
-          i++;
+        // import {[^}]*} from
+        if (bc("from", 4)) {
+          i += 4;
 
-          while (i < n && ws(u(0))) i++;
-
-          // import {[^}]*} from
-          if (bc("from", 4)) {
-            i += 4;
-
-            goto from;
-          }
+          goto from;
         }
       }
 
@@ -654,26 +702,19 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
             // import [^\s,]+, {
             if (c(0) == '{') {
-              i++;
+              err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
+              assert(err == 0);
 
-              // import [^\s,]+, {[^}]*
-              while (i < n && u(0) != '}') i++;
+              err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i);
+              if (err < 0) goto err;
 
-              // import [^\s,]+, {[^}]*}
-              if (c(0) == '}') {
-                i++;
+              while (i < n && ws(u(0))) i++;
 
-                while (i < n && ws(u(0))) i++;
+              // import [^\s,]+, {[^}]*} from
+              if (bc("from", 4)) {
+                i += 4;
 
-                // import [^\s,]+, {[^}]*} from
-                if (bc("from", 4)) {
-                  i += 4;
-
-                  err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
-                  assert(err == 0);
-
-                  goto from;
-                }
+                goto from;
               }
             }
           }
@@ -764,13 +805,15 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       // export {
       else if (c(0) == '{') {
-        i++;
+        size_t bs = ++i;
 
         // export {[^}]*
         while (i < n && u(0) != '}') i++;
 
         // export {[^}]*}
         if (c(0) == '}') {
+          size_t be = i;
+
           i++;
 
           while (i < n && ws(u(0))) i++;
@@ -780,11 +823,115 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
             type |= bare_module_lexer_import | bare_module_lexer_reexport;
             is = es;
 
-            i += 4;
+            size_t resume = i + 4;
+
+            i = bs - 1;
+
+            err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i);
+            if (err < 0) goto err;
+
+            i = resume;
 
             goto from;
           }
+
+          // export {[^}]*}
+          size_t resume = i;
+
+          i = bs;
+
+          while (i < be) {
+            while (i < be && ws(u(0))) i++;
+
+            if (ids(c(0))) {
+              ss = i++;
+
+              while (id(c(0))) i++;
+
+              se = i;
+
+              while (i < be && ws(u(0))) i++;
+
+              // export {[^,}]+ as
+              if (i + 3 < be && bu("as", 2) && ws(u(2))) {
+                i += 3;
+
+                while (i < be && ws(u(0))) i++;
+
+                // export {[^,}]+ as [^\s,}]+
+                if (ids(c(0))) {
+                  ss = i++;
+
+                  while (id(c(0))) i++;
+
+                  se = i;
+                }
+              }
+
+              err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+              if (err < 0) goto err;
+            }
+
+            while (i < be && ws(u(0))) i++;
+
+            if (c(0) != ',') break;
+
+            i++;
+          }
+
+          i = resume;
         }
+      }
+
+      // export const
+      else if (bc("const", 5) && !id(c(5))) {
+        i += 5;
+
+        goto declaration;
+      }
+
+      // export let
+      else if (bc("let", 3) && !id(c(3))) {
+        i += 3;
+
+        goto declaration;
+      }
+
+      // export var
+      else if (bc("var", 3) && !id(c(3))) {
+        i += 3;
+
+        goto declaration;
+      }
+
+      // export function
+      else if (bc("function", 8) && !id(c(8))) {
+        i += 8;
+
+        while (i < n && ws(u(0))) i++;
+
+        // export function\*
+        if (c(0) == '*') i++;
+
+        goto declaration;
+      }
+
+      // export class
+      else if (bc("class", 5) && !id(c(5))) {
+        i += 5;
+
+        goto declaration;
+      }
+
+      // export default
+      else if (bc("default", 7) && !id(c(7))) {
+        ss = i;
+        se = i + 7;
+
+        i += 7;
+
+        err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+        if (err < 0) goto err;
       }
     }
 
@@ -1101,6 +1248,23 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
         err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
         if (err < 0) goto err;
       }
+    }
+
+    continue;
+
+  declaration:
+    while (i < n && ws(u(0))) i++;
+
+    // (const|let|var|function\*?|class) [identifier]
+    if (ids(c(0))) {
+      ss = i++;
+
+      while (id(c(0))) i++;
+
+      se = i;
+
+      err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+      if (err < 0) goto err;
     }
 
     continue;
