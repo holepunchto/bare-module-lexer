@@ -3,11 +3,11 @@
   "version": "1.5.0",
   "description": "Heuristic lexer for detecting imports and exports in JavaScript modules",
   "exports": {
+    "./package": "./package.json",
     ".": {
       "types": "./index.d.ts",
       "default": "./index.js"
-    },
-    "./package": "./package.json"
+    }
   },
   "imports": {
     "#binding": {
@@ -45,7 +45,6 @@
     "require-addon": "^1.0.2"
   },
   "devDependencies": {
-    "bare-buffer": "^3.0.0",
     "bare-compat-napi": "^1.0.0",
     "brittle": "^3.1.1",
     "cmake-bare": "^1.1.7",
