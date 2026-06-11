@@ -903,6 +903,15 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
   int d_paren = 0;
   int d_bracket = 0;
 
+  // A 'module.exports = { ... }' object literal whose property values are
+  // being lexed as ordinary code. The property list resumes at the next ','
+  // at the recorded depths, so values may contain require() and import()
+  // and still be seen.
+  bool properties = false;
+  int p_brace = 0;
+  int p_paren = 0;
+  int p_bracket = 0;
+
   while (i < n) {
     size_t j = bare_module_lexer__skip_trivia(s, n, i);
 
@@ -1521,6 +1530,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       if (brace_depth > 0) brace_depth--;
       if (declarators && brace_depth < d_brace) declarators = false;
+      if (properties && brace_depth < p_brace) properties = false;
       i++;
       prev = bare_module_lexer__prev_op;
       continue;
@@ -1534,6 +1544,12 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       // nesting depth.
       if (declarators && brace_depth == d_brace && paren_depth == d_paren && bracket_depth == d_bracket) {
         goto declarations;
+      }
+
+      // A pending 'module.exports = { ... }' resumes at a ',' at its own
+      // nesting depth.
+      if (properties && brace_depth == p_brace && paren_depth == p_paren && bracket_depth == p_bracket) {
+        goto properties;
       }
 
       continue;
@@ -1597,62 +1613,15 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       // exports = \{
       if (c(0) == '{') {
         i++;
+        brace_depth++;
+        prev = bare_module_lexer__prev_op;
 
-        while (i < n) {
-          i = bare_module_lexer__skip_trivia(s, n, i);
+        properties = true;
+        p_brace = brace_depth;
+        p_paren = paren_depth;
+        p_bracket = bracket_depth;
 
-          if (c(0) == '}') {
-            i++;
-            break;
-          }
-
-          if (c(0) == ',') {
-            i++;
-            continue;
-          }
-
-          if (i < n && idsl(u(0))) {
-            ss = i++;
-
-            while (i < n && idl(u(0))) i++;
-
-            se = i;
-
-            i = bare_module_lexer__skip_trivia(s, n, i);
-
-            // 'get name()', 'async name()' - the exported name follows the
-            // modifier.
-            if (i < n && idsl(u(0))) {
-              ss = i++;
-
-              while (i < n && idl(u(0))) i++;
-
-              se = i;
-
-              i = bare_module_lexer__skip_trivia(s, n, i);
-            }
-
-            err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
-            if (err < 0) goto err;
-
-            // 'name: value' or a method - skip the value to the next entry.
-            if (c(0) == ':' || c(0) == '(') {
-              if (c(0) == ':') i++;
-
-              i = bare_module_lexer__skip_value(s, n, i);
-            }
-          }
-
-          // Spread, string or computed key - skip the entry without
-          // exporting a name.
-          else {
-            size_t j = bare_module_lexer__skip_value(s, n, i);
-
-            if (j == i) break;
-
-            i = j;
-          }
-        }
+        goto properties;
       }
 
       // exports = require
@@ -1809,6 +1778,78 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
     }
 
     continue;
+
+  properties:
+    i = bare_module_lexer__skip_trivia(s, n, i);
+
+    // End of object - let the outer loop consume the '}', which clears the
+    // properties state via brace depth tracking.
+    if (i >= n || u(0) == '}') continue;
+
+    // Stray ',' or leading ',' (comma-first style after the opening brace).
+    if (u(0) == ',') {
+      i++;
+
+      goto properties;
+    }
+
+    // Identifier key: shorthand, 'name: value', or a method.
+    if (idsl(u(0))) {
+      ss = i++;
+
+      while (i < n && idl(u(0))) i++;
+
+      se = i;
+
+      i = bare_module_lexer__skip_trivia(s, n, i);
+
+      // 'get name()', 'async name()' - the exported name follows the
+      // modifier.
+      if (i < n && idsl(u(0))) {
+        ss = i++;
+
+        while (i < n && idl(u(0))) i++;
+
+        se = i;
+
+        i = bare_module_lexer__skip_trivia(s, n, i);
+      }
+
+      err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+      if (err < 0) goto err;
+
+      // 'name:' - let the outer loop lex the value and resume at the next
+      // ',' at this nesting depth.
+      if (c(0) == ':') {
+        i++;
+        prev = bare_module_lexer__prev_op;
+
+        continue;
+      }
+
+      // 'name(' - a method definition; skip the parameter list and body
+      // wholesale.
+      if (c(0) == '(') {
+        i = bare_module_lexer__skip_value(s, n, i);
+
+        goto properties;
+      }
+
+      // Shorthand - the next entry follows.
+      goto properties;
+    }
+
+    // Spread, string key, computed key - skip the entry without exporting
+    // a name.
+    {
+      size_t j = bare_module_lexer__skip_value(s, n, i);
+
+      if (j == i) continue;
+
+      i = j;
+    }
+
+    goto properties;
   }
 
 #undef u
