@@ -15,7 +15,8 @@ interface Export {
 
 declare function lex(
   input: string | Buffer,
-  encoding?: BufferEncoding
+  encoding?: BufferEncoding,
+  opts?: object
 ): {
   imports: Import[]
   exports: Export[]
