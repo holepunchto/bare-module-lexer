@@ -526,6 +526,40 @@ test('module.exports = { name: value, name }', (t) => {
       { name: 'e', position: [0, 56, 57] }
     ]
   })
+
+  t.alike(
+    lex("module.exports = { a: require('./a.js'), b: require('./b.js'), c: require('./c.js') }"),
+    {
+      imports: [
+        {
+          specifier: './a.js',
+          type: REQUIRE,
+          names: [],
+          attributes: {},
+          position: [22, 31, 37]
+        },
+        {
+          specifier: './b.js',
+          type: REQUIRE,
+          names: [],
+          attributes: {},
+          position: [44, 53, 59]
+        },
+        {
+          specifier: './c.js',
+          type: REQUIRE,
+          names: [],
+          attributes: {},
+          position: [66, 75, 81]
+        }
+      ],
+      exports: [
+        { name: 'a', position: [0, 19, 20] },
+        { name: 'b', position: [0, 41, 42] },
+        { name: 'c', position: [0, 63, 64] }
+      ]
+    }
+  )
 })
 
 test('module.exports = { ...spread, name }', (t) => {
