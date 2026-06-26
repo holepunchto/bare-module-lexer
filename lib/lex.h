@@ -1827,29 +1827,110 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
         continue;
       }
 
-      // 'name(' - a method definition; skip the parameter list and body
-      // wholesale.
+      // 'name(' - a method definition. Let the outer loop lex the parameter
+      // list and body as ordinary code (it may contain require() or
+      // import()) and resume at the next ',' at this nesting depth.
       if (c(0) == '(') {
-        i = bare_module_lexer__skip_value(s, n, i);
+        prev = bare_module_lexer__prev_op;
 
-        goto properties;
+        continue;
       }
 
       // Shorthand - the next entry follows.
       goto properties;
     }
 
-    // Spread, string key, computed key - skip the entry without exporting
-    // a name.
-    {
-      size_t j = bare_module_lexer__skip_value(s, n, i);
+    // Spread of require(...) - 'module.exports = { ...require("x") }' spreads
+    // the required module's exports onto 'module.exports', which is the same
+    // re-export as 'module.exports = require("x")'.
+    if (i + 2 < n && u(0) == '.' && u(1) == '.' && u(2) == '.') {
+      size_t p = bare_module_lexer__skip_trivia(s, n, i + 3);
 
-      if (j == i) continue;
+      if (bare_module_lexer__at_kw(s, n, p, "require", 7)) {
+        type = bare_module_lexer_reexport;
+        names = NULL;
+        attributes = NULL;
+        is = p;
+        i = p + 7;
+        prev = bare_module_lexer__prev_expr;
 
-      i = j;
+        goto require;
+      }
     }
 
-    goto properties;
+    // String key - 'module.exports = { "foo": ... }'. The string literal is a
+    // statically known export name, used when the name isn't a valid
+    // identifier (e.g. a kebab-cased name).
+    if (u(0) == '\'' || u(0) == '"') {
+      size_t ns; // Name start
+      size_t ne; // Name end
+
+      if (bare_module_lexer__lex_string(s, n, &i, &ns, &ne)) {
+        i = bare_module_lexer__skip_trivia(s, n, i);
+
+        // '"foo":' (property) or '"foo"(' (method) - both name an export.
+        if (c(0) == ':' || c(0) == '(') {
+          err = bare_module_lexer__add_export(env, exports, &el, s, es, ns, ne);
+          if (err < 0) goto err;
+
+          // Consume the ':' but leave the '(' for the outer loop to lex the
+          // method's parameter list and body.
+          if (c(0) == ':') i++;
+
+          prev = bare_module_lexer__prev_op;
+
+          continue;
+        }
+      }
+
+      // Unterminated string or not a key. Resume at the next entry.
+      prev = bare_module_lexer__prev_expr;
+
+      continue;
+    }
+
+    // Computed key with a string literal - 'module.exports = { ["foo"]: ... }'.
+    // The name is still statically known. Other computed keys (identifiers,
+    // expressions, or a require()) can't be resolved and fall through to be
+    // lexed as ordinary code below.
+    if (u(0) == '[') {
+      size_t p = bare_module_lexer__skip_trivia(s, n, i + 1);
+
+      if (p < n && (s[p] == '\'' || s[p] == '"')) {
+        size_t ns; // Name start
+        size_t ne; // Name end
+        size_t q = p;
+
+        if (bare_module_lexer__lex_string(s, n, &q, &ns, &ne)) {
+          q = bare_module_lexer__skip_trivia(s, n, q);
+
+          if (q < n && s[q] == ']') {
+            q = bare_module_lexer__skip_trivia(s, n, q + 1);
+
+            // '["foo"]:' (property) or '["foo"](' (method).
+            if (q < n && (s[q] == ':' || s[q] == '(')) {
+              err = bare_module_lexer__add_export(env, exports, &el, s, es, ns, ne);
+              if (err < 0) goto err;
+
+              i = s[q] == ':' ? q + 1 : q;
+              prev = bare_module_lexer__prev_op;
+
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    // Numeric key, generator method, a spread of anything other than
+    // require(), or any other computed key. No export name can be extracted
+    // (a numeric key would require canonicalization, e.g. '0xff' names the
+    // property "255"), but the entry may still contain require() or import().
+    // Let the outer loop lex it as ordinary code and resume at the next ','
+    // at this nesting depth.
+    prev = bare_module_lexer__prev_op;
+
+    continue;
   }
 
 #undef u

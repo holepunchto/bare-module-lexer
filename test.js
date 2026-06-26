@@ -576,6 +576,171 @@ test('module.exports = { get name() {} }', (t) => {
   })
 })
 
+test('module.exports = { get name() { return require(...) } }', (t) => {
+  t.alike(lex("module.exports = { get foo() { return require('./a.js') } }"), {
+    imports: [
+      {
+        specifier: './a.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [38, 47, 53]
+      }
+    ],
+    exports: [{ name: 'foo', position: [0, 23, 26] }]
+  })
+
+  t.alike(lex("module.exports = { foo, get bar() { return require.addon.resolve('.') } }"), {
+    imports: [
+      {
+        specifier: '.',
+        type: REQUIRE | ADDON | RESOLVE,
+        names: [],
+        attributes: {},
+        position: [43, 66, 67]
+      }
+    ],
+    exports: [
+      { name: 'foo', position: [0, 19, 22] },
+      { name: 'bar', position: [0, 28, 31] }
+    ]
+  })
+})
+
+test('module.exports = { name() { return require(...) } }', (t) => {
+  t.alike(lex("module.exports = { baz() { return require('./b.js') } }"), {
+    imports: [
+      {
+        specifier: './b.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [34, 43, 49]
+      }
+    ],
+    exports: [{ name: 'baz', position: [0, 19, 22] }]
+  })
+})
+
+test('module.exports = { *name() { return require(...) } }', (t) => {
+  t.alike(lex("module.exports = { *foo() { return require('./a.js') } }"), {
+    imports: [
+      {
+        specifier: './a.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [35, 44, 50]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('module.exports = { ...require(...) }', (t) => {
+  t.alike(lex("module.exports = { ...require('./a.js') }"), {
+    imports: [
+      {
+        specifier: './a.js',
+        type: REQUIRE | REEXPORT,
+        names: [],
+        attributes: {},
+        position: [22, 31, 37]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("module.exports = { foo, ...require('./a.js'), bar }"), {
+    imports: [
+      {
+        specifier: './a.js',
+        type: REQUIRE | REEXPORT,
+        names: [],
+        attributes: {},
+        position: [27, 36, 42]
+      }
+    ],
+    exports: [
+      { name: 'foo', position: [0, 19, 22] },
+      { name: 'bar', position: [0, 46, 49] }
+    ]
+  })
+})
+
+test('module.exports = { "name": require(...) }', (t) => {
+  t.alike(lex("module.exports = { 'foo': require('./a.js') }"), {
+    imports: [
+      {
+        specifier: './a.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [26, 35, 41]
+      }
+    ],
+    exports: [{ name: 'foo', position: [0, 20, 23] }]
+  })
+
+  t.alike(lex("module.exports = { 'foo-bar': 1, baz }"), {
+    imports: [],
+    exports: [
+      { name: 'foo-bar', position: [0, 20, 27] },
+      { name: 'baz', position: [0, 33, 36] }
+    ]
+  })
+})
+
+test('module.exports = { ["name"]: ... }', (t) => {
+  t.alike(lex("module.exports = { ['foo-bar']: 1 }"), {
+    imports: [],
+    exports: [{ name: 'foo-bar', position: [0, 21, 28] }]
+  })
+})
+
+test('module.exports = { "name"() {} }', (t) => {
+  t.alike(lex("module.exports = { 'foo'() { return require('./a.js') } }"), {
+    imports: [
+      {
+        specifier: './a.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [36, 45, 51]
+      }
+    ],
+    exports: [{ name: 'foo', position: [0, 20, 23] }]
+  })
+})
+
+test('module.exports = { [computed]: require(...) }', (t) => {
+  t.alike(lex("module.exports = { [foo]: require('./a.js') }"), {
+    imports: [
+      {
+        specifier: './a.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [26, 35, 41]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("module.exports = { [require('./k.js')]: 1 }"), {
+    imports: [
+      {
+        specifier: './k.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [20, 29, 35]
+      }
+    ],
+    exports: []
+  })
+})
+
 test('module.exports = { unicode name }', (t) => {
   t.alike(lex('module.exports = { caf\u00e9 }'), {
     imports: [],
