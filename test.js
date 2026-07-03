@@ -1879,3 +1879,249 @@ test('identifier containing keyword is not exports', (t) => {
     exports: []
   })
 })
+
+test('import type default from "id"', (t) => {
+  t.alike(lex("import type Foo from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('import type { name } from "id"', (t) => {
+  t.alike(lex("import type { Foo } from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('import type { name, name } from "id"', (t) => {
+  t.alike(lex("import type { Foo, Bar } from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('import type * as namespace from "id"', (t) => {
+  t.alike(lex("import type * as Foo from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('import type { name as name } from "id"', (t) => {
+  t.alike(lex("import type { Foo as Bar } from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('export type { name } from "id"', (t) => {
+  t.alike(lex("export type { Foo } from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('export type { name }', (t) => {
+  t.alike(lex('export type { Foo }'), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('export type * from "id"', (t) => {
+  t.alike(lex("export type * from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('export type * as namespace from "id"', (t) => {
+  t.alike(lex("export type * as ns from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('import { type name } from "id"', (t) => {
+  t.alike(lex("import { type Foo } from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('import { type name, name } from "id"', (t) => {
+  t.alike(lex("import { type Foo, Bar } from './foo'"), {
+    imports: [
+      {
+        specifier: './foo',
+        type: IMPORT,
+        names: ['Bar'],
+        attributes: {},
+        position: [0, 31, 36]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('import { type name as name, name } from "id"', (t) => {
+  t.alike(lex("import { type Foo as X, Bar } from './foo'"), {
+    imports: [
+      {
+        specifier: './foo',
+        type: IMPORT,
+        names: ['Bar'],
+        attributes: {},
+        position: [0, 36, 41]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('import default, { type name, name } from "id"', (t) => {
+  t.alike(lex("import Foo, { type Bar, Baz } from './foo'"), {
+    imports: [
+      {
+        specifier: './foo',
+        type: IMPORT,
+        names: ['default', 'Baz'],
+        attributes: {},
+        position: [0, 36, 41]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('export { type name } from "id"', (t) => {
+  t.alike(lex("export { type Foo } from './foo'"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('export { type name, name } from "id"', (t) => {
+  t.alike(lex("export { type Foo, Bar } from './foo'"), {
+    imports: [
+      {
+        specifier: './foo',
+        type: IMPORT | REEXPORT,
+        names: ['Bar'],
+        attributes: {},
+        position: [0, 31, 36]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('export { name, type name } from "id"', (t) => {
+  t.alike(lex("export { Foo, type Bar } from './foo'"), {
+    imports: [
+      {
+        specifier: './foo',
+        type: IMPORT | REEXPORT,
+        names: ['Foo'],
+        attributes: {},
+        position: [0, 31, 36]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('export { type name }', (t) => {
+  t.alike(lex('export { type Foo }'), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('export { type name, name }', (t) => {
+  t.alike(lex('export { type Foo, Bar }'), {
+    imports: [],
+    exports: [{ name: 'Bar', position: [0, 19, 22] }]
+  })
+})
+
+test("import name = require('id')", (t) => {
+  t.alike(lex("import foo = require('./foo')"), {
+    imports: [
+      {
+        specifier: './foo',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [13, 22, 27]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("export import name = require('id')", (t) => {
+  t.alike(lex("export import foo = require('./foo')"), {
+    imports: [
+      {
+        specifier: './foo',
+        type: REQUIRE | REEXPORT,
+        names: [],
+        attributes: {},
+        position: [20, 29, 34]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('import name = namespace.member', (t) => {
+  t.alike(lex('import foo = Bar.Baz'), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('export = value', (t) => {
+  t.alike(lex('export = foo'), {
+    imports: [],
+    exports: []
+  })
+})
+
+test("export = require('id')", (t) => {
+  t.alike(lex("export = require('./foo')"), {
+    imports: [
+      {
+        specifier: './foo',
+        type: REQUIRE | REEXPORT,
+        names: [],
+        attributes: {},
+        position: [9, 18, 23]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('type annotation: import("id").name', (t) => {
+  t.alike(lex("let x: import('./foo').Bar"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('type alias: typeof import("id")', (t) => {
+  t.alike(lex("type X = typeof import('./foo')"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('type alias: import("id").name', (t) => {
+  t.alike(lex("type X = import('./foo').Y"), {
+    imports: [],
+    exports: []
+  })
+})
