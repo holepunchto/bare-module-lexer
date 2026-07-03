@@ -434,6 +434,136 @@ bare_module_lexer__skip_value(const utf8_t *s, size_t n, size_t i) {
   return i;
 }
 
+// True when any byte in [a, b) is a line terminator.
+static inline bool
+bare_module_lexer__has_line_terminator(const utf8_t *s, size_t a, size_t b) {
+  for (size_t k = a; k < b; k++) {
+    if (lt(s[k])) return true;
+  }
+
+  return false;
+}
+
+// Heuristic ASI for type expressions: a line terminator at the outer nesting
+// level continues the type only when the previous significant byte is a
+// trailing operator or the next one is a leading operator. Being wrong here
+// only ever stops a type early - the remainder is then lexed as ordinary
+// code - so it never swallows a following statement's require()/import().
+static inline bool
+bare_module_lexer__type_continues(uint8_t last, uint8_t next) {
+  switch (last) {
+  case '=':
+  case '|':
+  case '&':
+  case ',':
+  case '<':
+  case '(':
+  case '[':
+  case '{':
+  case '.':
+  case '?':
+  case ':':
+    return true;
+  }
+
+  switch (next) {
+  case '|':
+  case '&':
+  case '.':
+  case '?':
+  case ':':
+    return true;
+  }
+
+  return false;
+}
+
+// Skip a TypeScript type expression starting at i - a type alias right-hand
+// side or a ':' annotation. Types are erased at compile time, so any
+// import(...) inside one is not a runtime dependency and must not be lexed as
+// a module import. Strings, templates, and comments are skipped wholesale;
+// '()[]{}' and '<>' nesting is tracked so commas and arrows inside generics
+// and function types don't end the scan early. Stops at the outer level on
+// ';', ',', or '=' (but not '=>'), on a closing bracket that would underflow
+// an enclosing list, on a non-continuing line terminator, or at end of input.
+static inline size_t
+bare_module_lexer__skip_type(const utf8_t *s, size_t n, size_t i) {
+  int depth = 0; // () [] {} nesting
+  int angle = 0; // <> nesting
+
+  uint8_t last = 0; // Previous significant byte, for ASI continuation
+
+  while (i < n) {
+    uint8_t ch = u(0);
+
+    // Line terminator - at the outer level it may end the type.
+    if (lt(ch)) {
+      if (depth == 0 && angle == 0) {
+        size_t p = bare_module_lexer__skip_trivia(s, n, i);
+
+        if (!bare_module_lexer__type_continues(last, p < n ? s[p] : 0)) break;
+
+        i = p;
+        continue;
+      }
+
+      i++;
+      continue;
+    }
+
+    // Other whitespace and comments.
+    if (ws(ch) || (ch == '/' && i + 1 < n && (u(1) == '/' || u(1) == '*'))) {
+      size_t j = bare_module_lexer__skip_trivia(s, n, i);
+
+      if (j == i) i++;
+      else i = j;
+
+      continue;
+    }
+
+    // Strings and templates are opaque.
+    if (ch == '\'' || ch == '"') {
+      size_t vs, ve;
+      bare_module_lexer__lex_string(s, n, &i, &vs, &ve);
+      last = '"';
+      continue;
+    }
+
+    if (ch == '`') {
+      i = bare_module_lexer__skip_template(s, n, i);
+      last = '`';
+      continue;
+    }
+
+    if (depth == 0 && angle == 0) {
+      // A ';', ',', or bare '=' at the outer level ends the type.
+      if (ch == ';' || ch == ',') break;
+
+      if (ch == '=' && !(i + 1 < n && u(1) == '>')) break;
+
+      // A closing bracket at the outer level belongs to an enclosing list.
+      if (ch == ')' || ch == ']' || ch == '}') break;
+    }
+
+    // '=>' arrow - consume both bytes so the '>' isn't taken as a '<>' close.
+    if (ch == '=' && i + 1 < n && u(1) == '>') {
+      last = '>';
+      i += 2;
+      continue;
+    }
+
+    if (ch == '(' || ch == '[' || ch == '{') depth++;
+    else if (ch == ')' || ch == ']' || ch == '}') depth--;
+    else if (ch == '<') angle++;
+    else if (ch == '>' && angle > 0) angle--;
+
+    last = ch;
+    i++;
+  }
+
+  return i;
+}
+
 // Maximum destructuring pattern nesting tracked. Deeper nesting has its
 // entries skipped rather than failing - the lexer must never throw.
 #define BARE_MODULE_LEXER__PATTERN_DEPTH 32
@@ -684,6 +814,28 @@ bare_module_lexer__lex_member_suffix(const utf8_t *s, size_t n, size_t i, int *t
   return i;
 }
 
+// Detect a TypeScript inline `type` modifier at the start of an
+// import/export specifier. The modifier is the keyword `type` followed by
+// another binding name - an identifier or string literal - rather than by
+// `as`, `,`, or the closing brace. In `{ type }`, `{ type, x }`, and
+// `{ type as x }` the word `type` is itself the imported/exported name, not a
+// modifier. On a match, returns the index of the binding name that follows so
+// the specifier can be skipped; otherwise returns i unchanged.
+static inline size_t
+bare_module_lexer__lex_type_modifier(const utf8_t *s, size_t n, size_t i) {
+  if (!bare_module_lexer__at_kw(s, n, i, "type", 4)) return i;
+
+  size_t p = bare_module_lexer__skip_trivia(s, n, i + 4);
+
+  if (p >= n) return i;
+
+  if (bare_module_lexer__at_kw(s, n, p, "as", 2)) return i;
+
+  if (idsl(s[p]) || s[p] == '\'' || s[p] == '"') return p;
+
+  return i;
+}
+
 static inline int
 bare_module_lexer__lex_import_attributes(js_env_t *env, js_value_t **attributes, const utf8_t *s, size_t n, size_t i, size_t *result) {
   int err;
@@ -740,12 +892,22 @@ bare_module_lexer__lex_import_attributes(js_env_t *env, js_value_t **attributes,
   return 0;
 }
 
+// Lex the '{ ... }' of an import or re-export specifier list, emitting a name
+// for each value binding. TypeScript's inline `type` modifier erases the
+// binding it precedes. When the list is non-empty and every binding is
+// type-only, *only_type is set so the caller can erase the whole declaration;
+// it is left false for an empty list, which is a bindingless side-effect
+// import. *only_type may be NULL when the caller has a value binding of its
+// own (a default or namespace import) and so never erases.
 static inline int
-bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t *nl, const utf8_t *s, size_t n, size_t i, size_t *result) {
+bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t *nl, const utf8_t *s, size_t n, size_t i, size_t *result, bool *only_type) {
   int err;
 
   size_t ns; // Name start
   size_t ne; // Name end
+
+  bool any = false;   // Saw at least one binding
+  bool value = false; // Saw at least one value (non-type) binding
 
   i = bare_module_lexer__skip_trivia(s, n, i);
 
@@ -754,6 +916,12 @@ bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t 
 
     while (c(0) != '}') {
       i = bare_module_lexer__skip_trivia(s, n, i);
+
+      // A leading `type` modifier erases the binding it precedes.
+      size_t p = bare_module_lexer__lex_type_modifier(s, n, i);
+      bool is_type = p != i;
+
+      if (is_type) i = p;
 
       // Name is an identifier or a string literal (arbitrary module
       // namespace names, e.g. 'import { "x" as y }').
@@ -767,8 +935,15 @@ bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t 
         if (!bare_module_lexer__lex_string(s, n, &i, &ns, &ne)) break;
       } else break;
 
-      err = bare_module_lexer__add_name(env, names, nl, &s[ns], ne - ns);
-      assert(err == 0);
+      any = true;
+
+      // A type-only binding is erased - keep no name for it.
+      if (!is_type) {
+        value = true;
+
+        err = bare_module_lexer__add_name(env, names, nl, &s[ns], ne - ns);
+        assert(err == 0);
+      }
 
       i = bare_module_lexer__skip_trivia(s, n, i);
 
@@ -797,6 +972,8 @@ bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t 
 
     if (c(0) == '}') i++;
   }
+
+  if (only_type != NULL) *only_type = any && !value;
 
   *result = i;
 
@@ -882,6 +1059,10 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
   js_value_t *attributes;
 
   bool matched;
+
+  // Set when an import's binding list is entirely TypeScript type-only
+  // specifiers, so the declaration is erased rather than emitted.
+  bool type_only;
 
   // Previous significant token classification - see enum at top.
   int prev = bare_module_lexer__prev_op;
@@ -1002,6 +1183,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       type = 0;
       names = NULL;
       attributes = NULL;
+      type_only = false;
 
       if (bare_module_lexer__match_kw(s, ks, kl, "require", 7)) {
         is = ks;
@@ -1049,7 +1231,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
         // import {
         else if (c(0) == '{') {
-          err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i);
+          err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i, &type_only);
           if (err < 0) goto err;
 
           i = bare_module_lexer__skip_trivia(s, n, i);
@@ -1155,7 +1337,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
                 err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
                 assert(err == 0);
 
-                err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i);
+                err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i, NULL);
                 if (err < 0) goto err;
 
                 i = bare_module_lexer__skip_trivia(s, n, i);
@@ -1314,7 +1496,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
               i = bs - 1;
 
-              err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i);
+              err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i, &type_only);
               if (err < 0) goto err;
 
               i = resume;
@@ -1329,6 +1511,12 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
             while (i < be) {
               i = bare_module_lexer__skip_trivia(s, be, i);
+
+              // A leading `type` modifier erases the binding it precedes.
+              size_t p = bare_module_lexer__lex_type_modifier(s, be, i);
+              bool is_type = p != i;
+
+              if (is_type) i = p;
 
               if (i < be && idsl(u(0))) {
                 ss = i++;
@@ -1356,8 +1544,11 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
                   }
                 }
 
-                err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
-                if (err < 0) goto err;
+                // A type-only binding is erased - export no name for it.
+                if (!is_type) {
+                  err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+                  if (err < 0) goto err;
+                }
               }
 
               i = bare_module_lexer__skip_trivia(s, be, i);
@@ -1368,6 +1559,52 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
             }
 
             i = resume;
+          }
+        }
+
+        // export = require('id') - a TypeScript export assignment that
+        // re-exports the required module wholesale, like 'module.exports =
+        // require('id')'.
+        else if (c(0) == '=') {
+          i = bare_module_lexer__skip_trivia(s, n, i + 1);
+
+          // export = require
+          if (bare_module_lexer__at_kw(s, n, i, "require", 7)) {
+            type |= bare_module_lexer_reexport;
+            is = i;
+
+            i += 7;
+
+            goto require;
+          }
+        }
+
+        // export import name = require('id') - a CommonJS re-export via a
+        // TypeScript import assignment. The bound name is re-exported, so the
+        // require is flagged as a re-export.
+        else if (bare_module_lexer__at_kw(s, n, i, "import", 6)) {
+          i = bare_module_lexer__skip_trivia(s, n, i + 6);
+
+          // export import [name]
+          if (i < n && idsl(u(0))) {
+            while (i < n && idl(u(0))) i++;
+
+            i = bare_module_lexer__skip_trivia(s, n, i);
+
+            // export import [name] =
+            if (c(0) == '=') {
+              i = bare_module_lexer__skip_trivia(s, n, i + 1);
+
+              // export import [name] = require
+              if (bare_module_lexer__at_kw(s, n, i, "require", 7)) {
+                type |= bare_module_lexer_reexport;
+                is = i;
+
+                i += 7;
+
+                goto require;
+              }
+            }
           }
         }
 
@@ -1462,6 +1699,54 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
         }
 
         continue;
+      }
+
+      // TypeScript type alias 'type Name [<...>] = <type>'. The whole
+      // declaration is a type, so it is skipped and any import(...) inside it
+      // is not lexed as a module import. The alias name must sit on the same
+      // line as 'type' so a plain 'type' expression before a line break isn't
+      // mistaken for an alias.
+      if (bare_module_lexer__match_kw(s, ks, kl, "type", 4) && prev != bare_module_lexer__prev_dot) {
+        size_t p = bare_module_lexer__skip_trivia(s, n, ke);
+
+        if (p < n && idsl(s[p]) && !bare_module_lexer__has_line_terminator(s, ke, p)) {
+          size_t eq = bare_module_lexer__skip_type(s, n, p);
+
+          // 'type Name ... =' (but not '=>') confirms a type alias.
+          if (eq < n && s[eq] == '=' && !(eq + 1 < n && s[eq + 1] == '>')) {
+            i = bare_module_lexer__skip_type(s, n, eq + 1);
+            prev = bare_module_lexer__prev_op;
+
+            continue;
+          }
+        }
+
+        // Not an alias - fall through and treat 'type' as a plain identifier.
+      }
+
+      // TypeScript variable type annotation '(const|let|var) name: <type>'.
+      // The annotation is skipped so import(...) inside it isn't lexed as a
+      // module import, while an '=' initializer is left for the main loop so
+      // require()/import() in it are still seen.
+      if (prev == bare_module_lexer__prev_op && (bare_module_lexer__match_kw(s, ks, kl, "const", 5) || bare_module_lexer__match_kw(s, ks, kl, "let", 3) || bare_module_lexer__match_kw(s, ks, kl, "var", 3))) {
+        size_t p = bare_module_lexer__skip_trivia(s, n, ke);
+
+        if (p < n && idsl(s[p])) {
+          size_t q = p + 1;
+
+          while (q < n && idl(s[q])) q++;
+
+          size_t r = bare_module_lexer__skip_trivia(s, n, q);
+
+          if (r < n && s[r] == ':') {
+            i = bare_module_lexer__skip_type(s, n, r + 1);
+            prev = bare_module_lexer__prev_op;
+
+            continue;
+          }
+        }
+
+        // Fall through - a plain declaration lexed as ordinary code.
       }
 
       // Plain identifier or a keyword that only affects classification.
@@ -1706,8 +1991,11 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
           if (err < 0) goto err;
         }
 
-        err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
-        if (err < 0) goto err;
+        // A type-only specifier list is erased along with its declaration.
+        if (!type_only) {
+          err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+          if (err < 0) goto err;
+        }
       }
     }
 
