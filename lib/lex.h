@@ -937,9 +937,8 @@ bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t 
 
       any = true;
 
-      if (is_type) {
-        // A type-only binding is erased - keep no name for it.
-      } else {
+      // A type-only binding is erased - keep no name for it.
+      if (!is_type) {
         value = true;
 
         err = bare_module_lexer__add_name(env, names, nl, &s[ns], ne - ns);
