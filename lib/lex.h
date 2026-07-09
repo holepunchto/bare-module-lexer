@@ -1001,7 +1001,15 @@ bare_module_lexer__lex_call(js_env_t *env, js_value_t **attributes, const utf8_t
     if (bare_module_lexer__lex_string(s, n, &i, ss, se)) {
       i = bare_module_lexer__skip_trivia(s, n, i);
 
-      if (c(0) == ',') {
+      // The string is the specifier only when it is the complete first
+      // argument, i.e. immediately followed by ')' or ','. Anything else, such
+      // as '+', means the string is the start of a larger expression and is not
+      // a specifier, so the call is left unmatched.
+      if (c(0) == ')') {
+        i++;
+
+        *matched = true;
+      } else if (c(0) == ',') {
         i++;
 
         i = bare_module_lexer__skip_trivia(s, n, i);
@@ -1019,14 +1027,14 @@ bare_module_lexer__lex_call(js_env_t *env, js_value_t **attributes, const utf8_t
             }
           }
         }
-      }
 
-      while (i < n && u(0) != ')') i++;
+        while (i < n && u(0) != ')') i++;
 
-      if (c(0) == ')') {
-        i++;
+        if (c(0) == ')') {
+          i++;
 
-        *matched = true;
+          *matched = true;
+        }
       }
     }
   }
