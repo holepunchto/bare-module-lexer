@@ -1812,6 +1812,55 @@ test('invalid require', (t) => {
   })
 })
 
+test('concatenated specifier is not require()', (t) => {
+  t.alike(lex("require('./' + n)"), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('require("./" + n)'), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex("require('./foo/' + n + '.js')"), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex("require.resolve('./' + n)"), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex("require.addon('./' + n)"), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex("require.asset('./' + n)"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('concatenated specifier is not import()', (t) => {
+  t.alike(lex("import('./' + n)"), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('import("./" + n)'), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex("import('./foo/' + n + '.js')"), {
+    imports: [],
+    exports: []
+  })
+})
+
 test('invalid import', (t) => {
   t.alike(lex("imported from './foo.js'"), {
     imports: [],
