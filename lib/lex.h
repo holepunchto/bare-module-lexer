@@ -980,13 +980,51 @@ bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t 
   return 0;
 }
 
+// Match the base URL argument of an artifact or resolve call. The specifier
+// can only be resolved statically when the base is the referring module
+// itself: '__filename' in a CommonJS module, or 'import.meta.url' /
+// 'import.meta.filename' in an ES module. Returns the position past the base
+// when matched, or i unchanged when it is any other value.
+static inline size_t
+bare_module_lexer__lex_base(const utf8_t *s, size_t n, size_t i, int type) {
+  if ((type & bare_module_lexer_require) && bare_module_lexer__at_kw(s, n, i, "__filename", 10)) {
+    return i + 10;
+  }
+
+  if ((type & bare_module_lexer_import) && bare_module_lexer__at_kw(s, n, i, "import", 6)) {
+    size_t p = bare_module_lexer__skip_trivia(s, n, i + 6);
+
+    if (p < n && s[p] == '.') {
+      p = bare_module_lexer__skip_trivia(s, n, p + 1);
+
+      if (bare_module_lexer__at_kw(s, n, p, "meta", 4)) {
+        p = bare_module_lexer__skip_trivia(s, n, p + 4);
+
+        if (p < n && s[p] == '.') {
+          p = bare_module_lexer__skip_trivia(s, n, p + 1);
+
+          if (bare_module_lexer__at_kw(s, n, p, "url", 3)) return p + 3;
+          if (bare_module_lexer__at_kw(s, n, p, "filename", 8)) return p + 8;
+        }
+      }
+    }
+  }
+
+  return i;
+}
+
 // Parse a call tail '([\s]*<string>[, { with: { ... } }][^)]*)' at *result,
 // which must point at the '('. On a match, fills the specifier bounds and
 // any import attributes and leaves the cursor past the ')'. When the
 // argument list doesn't start with a string literal, the cursor is left
 // just inside the '(' so the arguments lex as ordinary code.
+//
+// For the artifact and resolve variants ('require.asset', 'require.resolve',
+// 'require.addon[.resolve]', and the 'import.meta' equivalents) the second
+// argument is a base URL rather than an options object, and the call matches
+// only when that base is the referring module itself.
 static inline int
-bare_module_lexer__lex_call(js_env_t *env, js_value_t **attributes, const utf8_t *s, size_t n, size_t *result, size_t *ss, size_t *se, bool *matched) {
+bare_module_lexer__lex_call(js_env_t *env, js_value_t **attributes, const utf8_t *s, size_t n, size_t *result, size_t *ss, size_t *se, int type, bool *matched) {
   int err;
 
   size_t i = *result;
@@ -1014,26 +1052,44 @@ bare_module_lexer__lex_call(js_env_t *env, js_value_t **attributes, const utf8_t
 
         i = bare_module_lexer__skip_trivia(s, n, i);
 
-        // An options object '{ with: { ... } }'.
-        if (c(0) == '{') {
-          size_t p = bare_module_lexer__skip_trivia(s, n, i + 1);
+        // The artifact and resolve variants take a base URL as their second
+        // argument. It matches only when it is the referring module itself;
+        // any other base is a runtime value, so the call is left unmatched
+        // and the argument lexes as ordinary code.
+        if (type & (bare_module_lexer_addon | bare_module_lexer_asset | bare_module_lexer_resolve)) {
+          size_t p = bare_module_lexer__lex_base(s, n, i, type);
 
-          if (bare_module_lexer__at_kw(s, n, p, "with", 4)) {
-            p = bare_module_lexer__skip_trivia(s, n, p + 4);
+          if (p != i) {
+            i = bare_module_lexer__skip_trivia(s, n, p);
 
-            if (p < n && s[p] == ':') {
-              err = bare_module_lexer__lex_import_attributes(env, attributes, s, n, p + 1, &i);
-              if (err < 0) return err;
+            if (c(0) == ')') {
+              i++;
+
+              *matched = true;
             }
           }
-        }
+        } else {
+          // An options object '{ with: { ... } }'.
+          if (c(0) == '{') {
+            size_t p = bare_module_lexer__skip_trivia(s, n, i + 1);
 
-        while (i < n && u(0) != ')') i++;
+            if (bare_module_lexer__at_kw(s, n, p, "with", 4)) {
+              p = bare_module_lexer__skip_trivia(s, n, p + 4);
 
-        if (c(0) == ')') {
-          i++;
+              if (p < n && s[p] == ':') {
+                err = bare_module_lexer__lex_import_attributes(env, attributes, s, n, p + 1, &i);
+                if (err < 0) return err;
+              }
+            }
+          }
 
-          *matched = true;
+          while (i < n && u(0) != ')') i++;
+
+          if (c(0) == ')') {
+            i++;
+
+            *matched = true;
+          }
         }
       }
     }
@@ -1264,7 +1320,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
         else if (c(0) == '(') {
           type |= bare_module_lexer_dynamic;
 
-          err = bare_module_lexer__lex_call(env, &attributes, s, n, &i, &ss, &se, &matched);
+          err = bare_module_lexer__lex_call(env, &attributes, s, n, &i, &ss, &se, type, &matched);
           if (err < 0) goto err;
 
           if (matched) {
@@ -1294,7 +1350,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
               i = p;
 
               if (c(0) == '(') {
-                err = bare_module_lexer__lex_call(env, &attributes, s, n, &i, &ss, &se, &matched);
+                err = bare_module_lexer__lex_call(env, &attributes, s, n, &i, &ss, &se, type, &matched);
                 if (err < 0) goto err;
 
                 if (matched) {
@@ -1875,7 +1931,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
     // require(\.(resolve|addon(\.resolve)?|asset))?\(
     if (c(0) == '(') {
-      err = bare_module_lexer__lex_call(env, &attributes, s, n, &i, &ss, &se, &matched);
+      err = bare_module_lexer__lex_call(env, &attributes, s, n, &i, &ss, &se, type, &matched);
       if (err < 0) goto err;
 
       if (matched) {
