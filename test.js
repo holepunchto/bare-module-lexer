@@ -213,6 +213,65 @@ test('require.asset("id")', (t) => {
   })
 })
 
+test("require.asset('id', __filename)", (t) => {
+  t.alike(lex("require.asset('./foo.txt', __filename)"), {
+    imports: [
+      {
+        specifier: './foo.txt',
+        type: REQUIRE | ASSET,
+        names: [],
+        attributes: {},
+        position: [0, 15, 24]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("require.resolve('id', __filename)", (t) => {
+  t.alike(lex("require.resolve('./foo.js', __filename)"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE | RESOLVE,
+        names: [],
+        attributes: {},
+        position: [0, 17, 25]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("require.asset('id', notTheModule)", (t) => {
+  t.alike(lex("require.asset('./foo.txt', notTheModule)"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test("require.asset('id', __dirname)", (t) => {
+  t.alike(lex("require.asset('./foo.txt', __dirname)"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test("require.addon('id', require('./other'))", (t) => {
+  t.alike(lex("require.addon('./foo.bare', require('./other'))"), {
+    imports: [
+      {
+        specifier: './other',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [28, 37, 44]
+      }
+    ],
+    exports: []
+  })
+})
+
 test("require('id', { with: { type: 'name' } })", (t) => {
   t.alike(lex("require('./foo.js', { with: { type: 'script' } })"), {
     imports: [
@@ -1282,8 +1341,8 @@ test('import.meta.addon("id")', (t) => {
   })
 })
 
-test("import.meta.addon('id', __filename)", (t) => {
-  t.alike(lex("import.meta.addon('./foo.bare', __filename)"), {
+test("import.meta.addon('id', import.meta.url)", (t) => {
+  t.alike(lex("import.meta.addon('./foo.bare', import.meta.url)"), {
     imports: [
       {
         specifier: './foo.bare',
@@ -1297,8 +1356,8 @@ test("import.meta.addon('id', __filename)", (t) => {
   })
 })
 
-test('import.meta.addon("id", __filename)', (t) => {
-  t.alike(lex('import.meta.addon("./foo.bare", __filename)'), {
+test('import.meta.addon("id", import.meta.url)', (t) => {
+  t.alike(lex('import.meta.addon("./foo.bare", import.meta.url)'), {
     imports: [
       {
         specifier: './foo.bare',
@@ -1308,6 +1367,28 @@ test('import.meta.addon("id", __filename)', (t) => {
         position: [0, 19, 29]
       }
     ],
+    exports: []
+  })
+})
+
+test("import.meta.addon('id', import.meta.filename)", (t) => {
+  t.alike(lex("import.meta.addon('./foo.bare', import.meta.filename)"), {
+    imports: [
+      {
+        specifier: './foo.bare',
+        type: IMPORT | ADDON,
+        names: [],
+        attributes: {},
+        position: [0, 19, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("import.meta.addon('id', notTheModule)", (t) => {
+  t.alike(lex("import.meta.addon('./foo.bare', notTheModule)"), {
+    imports: [],
     exports: []
   })
 })
