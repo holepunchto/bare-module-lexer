@@ -22,51 +22,67 @@ lex(`
 // }
 ```
 
+<!-- bare-refgen:api start -->
 ## API
 
-#### `const { imports, exports } = lex(source[, encoding][, options])`
+### Functions
 
-`imports` is an array of objects with the following shape:
+#### `lex`
 
-```js
-imports = {
-  specifier: 'string',
-  type: number,
-  names: ['string'],
-  position: [
-    number, // Import start
-    number, // Specifier start
-    number // Specifier end
-  ]
+```ts
+lex(input: string | Buffer, encoding?: BufferEncoding, opts?: object): {
+  imports: Import[]
+  exports: Export[]
 }
 ```
 
-`exports` is an array of objects with the following shape:
+[source](https://github.com/holepunchto/bare-module-lexer/blob/v1.6.2/index.d.ts#L16)
 
-```js
-exports = {
-  name: 'string',
-  position: [
-    number, // Export start
-    number, // Name start
-    number // Name end
-  ]
+Lex `input` for import and export statements, returning the detected `imports` and `exports`.
+
+**Parameters**
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `input` | `string \| Buffer` | — | The source to lex, as a string or buffer. |
+| `encoding?` | `BufferEncoding` | — | The encoding of `input` when it is a string. |
+| `opts?` | `object` | — | Reserved; currently unused. |
+
+**Throws**
+
+- `TypeError` — `input` is not a string or buffer.
+
+### Types
+
+#### `Import`
+
+```ts
+interface Import {
+  specifier: string
+  type: number
+  names: string[]
+  attributes: { [attribute: string]: string }
+  position: [importStart: number, specifierStart: number, specifierEnd: number]
 }
 ```
 
-Options are reserved.
+[source](https://github.com/holepunchto/bare-module-lexer/blob/v1.6.2/index.d.ts#L3)
 
-#### `lex.constants`
+An import detected in the source. `type` is a combination of the `lex.constants` flags (e.g. `REQUIRE`, `IMPORT`, `DYNAMIC`); `position` holds the offsets `[importStart, specifierStart, specifierEnd]`.
 
-| Constant   | Description                                                                                                                                                                                                              |
-| :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REQUIRE`  | CommonJS `require()`.                                                                                                                                                                                                    |
-| `IMPORT`   | ES module `import`.                                                                                                                                                                                                      |
-| `DYNAMIC`  | ES module `import()` if `IMPORT` is set.                                                                                                                                                                                 |
-| `ADDON`    | CommonJS `require.addon()` if `REQUIRE` is set, or ES module `import.meta.addon()` if `IMPORT` is set.                                                                                                                   |
-| `ASSET`    | CommonJS `require.asset()` if `REQUIRE` is set, or ES module `import.meta.asset()` if `IMPORT` is set.                                                                                                                   |
-| `RESOLVE`  | CommonJS `require.resolve()` or `require.addon.resolve()` if `REQUIRE` and optionally `ADDON` are set, or ES module `import.meta.resolve()` or `import.meta.addon.resolve()` if `IMPORT` and optionally `ADDON` are set. |
-| `REEXPORT` | Re-export of a CommonJS `require()` if `REQUIRE` is set, or ES module `export from` if `IMPORT` is set.                                                                                                                  |
+#### `Export`
+
+```ts
+interface Export {
+  name: string
+  position: [exportStart: number, nameStart: number, nameEnd: number]
+}
+```
+
+[source](https://github.com/holepunchto/bare-module-lexer/blob/v1.6.2/index.d.ts#L11)
+
+An export detected in the source; `position` holds the offsets `[exportStart, nameStart, nameEnd]`.
+<!-- bare-refgen:api end -->
 
 ## License
 

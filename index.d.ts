@@ -1,5 +1,6 @@
 import Buffer, { BufferEncoding } from 'bare-buffer'
 
+/** An import detected in the source. `type` is a combination of the `lex.constants` flags (e.g. `REQUIRE`, `IMPORT`, `DYNAMIC`); `position` holds the offsets `[importStart, specifierStart, specifierEnd]`. */
 interface Import {
   specifier: string
   type: number
@@ -8,11 +9,19 @@ interface Import {
   position: [importStart: number, specifierStart: number, specifierEnd: number]
 }
 
+/** An export detected in the source; `position` holds the offsets `[exportStart, nameStart, nameEnd]`. */
 interface Export {
   name: string
   position: [exportStart: number, nameStart: number, nameEnd: number]
 }
 
+/**
+ * Lex `input` for import and export statements, returning the detected `imports` and `exports`.
+ * @param input - The source to lex, as a string or buffer.
+ * @param encoding - The encoding of `input` when it is a string.
+ * @param opts - Reserved; currently unused.
+ * @throws {TypeError} `input` is not a string or buffer.
+ */
 declare function lex(
   input: string | Buffer,
   encoding?: BufferEncoding,
