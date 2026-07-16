@@ -272,6 +272,13 @@ test("require.addon('id', require('./other'))", (t) => {
   })
 })
 
+test('require.addon(binding)', (t) => {
+  t.alike(lex('require.addon(binding)'), {
+    imports: [],
+    exports: []
+  })
+})
+
 test("require('id', { with: { type: 'name' } })", (t) => {
   t.alike(lex("require('./foo.js', { with: { type: 'script' } })"), {
     imports: [
@@ -322,6 +329,49 @@ test('require("id", { with: { type: "name" } })', (t) => {
         names: [],
         attributes: { type: 'script', imports: './imports.json' },
         position: [0, 9, 17]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("require('id', { with: { 'name': 'name' } })", (t) => {
+  t.alike(lex("require('./foo.js', { with: { 'type': 'json' } })"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: { type: 'json' },
+        position: [0, 9, 17]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("require('id', binding)", (t) => {
+  t.alike(lex("require('./foo.js', binding)"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [0, 9, 17]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("import('./foo.js', binding)"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT | DYNAMIC,
+        names: [],
+        attributes: {},
+        position: [0, 8, 16]
       }
     ],
     exports: []
@@ -518,6 +568,13 @@ test('exports["name"]', (t) => {
   t.alike(lex('exports["foo"] = 42'), {
     imports: [],
     exports: [{ name: 'foo', position: [0, 9, 12] }]
+  })
+})
+
+test('exports[computed] with non-string index', (t) => {
+  t.alike(lex('exports[foo] = 1'), {
+    imports: [],
+    exports: []
   })
 })
 
@@ -807,6 +864,16 @@ test('module.exports = { unicode name }', (t) => {
   })
 })
 
+test('exports = { name, name }', (t) => {
+  t.alike(lex('exports = { foo, bar }'), {
+    imports: [],
+    exports: [
+      { name: 'foo', position: [0, 12, 15] },
+      { name: 'bar', position: [0, 17, 20] }
+    ]
+  })
+})
+
 test('export const name', (t) => {
   t.alike(lex('export const foo = 42'), {
     imports: [],
@@ -906,6 +973,19 @@ test('export const declarator list and ASI', (t) => {
       { name: 'b', position: [0, 33, 34] }
     ]
   })
+
+  t.alike(lex('export const a = 1\r\nconst x = require("./foo.js")'), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [30, 39, 47]
+      }
+    ],
+    exports: [{ name: 'a', position: [0, 13, 14] }]
+  })
 })
 
 test('export const { pattern }', (t) => {
@@ -927,6 +1007,11 @@ test('export const { pattern }', (t) => {
     exports: [{ name: 'a', position: [0, 15, 16] }]
   })
 
+  t.alike(lex('export const { a = `t${x}` } = obj'), {
+    imports: [],
+    exports: [{ name: 'a', position: [0, 15, 16] }]
+  })
+
   t.alike(lex('export const { a, ...rest } = obj'), {
     imports: [],
     exports: [
@@ -939,6 +1024,11 @@ test('export const { pattern }', (t) => {
     imports: [],
     exports: [{ name: 'b', position: [0, 20, 21] }]
   })
+
+  t.alike(lex('export const { a: [b] } = obj'), {
+    imports: [],
+    exports: [{ name: 'b', position: [0, 19, 20] }]
+  })
 })
 
 test('export const [ pattern ]', (t) => {
@@ -947,6 +1037,23 @@ test('export const [ pattern ]', (t) => {
     exports: [
       { name: 'a', position: [0, 14, 15] },
       { name: 'b', position: [0, 19, 20] }
+    ]
+  })
+
+  t.alike(lex('export const [a, ...rest] = arr'), {
+    imports: [],
+    exports: [
+      { name: 'a', position: [0, 14, 15] },
+      { name: 'rest', position: [0, 20, 24] }
+    ]
+  })
+
+  t.alike(lex('export const [a, [b, c]] = arr'), {
+    imports: [],
+    exports: [
+      { name: 'a', position: [0, 14, 15] },
+      { name: 'b', position: [0, 18, 19] },
+      { name: 'c', position: [0, 21, 22] }
     ]
   })
 })
@@ -980,6 +1087,13 @@ test('export function name () {}', (t) => {
   t.alike(lex('export function foo () {}'), {
     imports: [],
     exports: [{ name: 'foo', position: [0, 16, 19] }]
+  })
+})
+
+test('export function* name () {}', (t) => {
+  t.alike(lex('export function* gen() {}'), {
+    imports: [],
+    exports: [{ name: 'gen', position: [0, 17, 20] }]
   })
 })
 
@@ -1601,6 +1715,21 @@ test("module.__exportStar(require('id'))", (t) => {
   })
 })
 
+test("module.__export(require('id'))", (t) => {
+  t.alike(lex("foo.__export(require('./foo.js'))"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE | REEXPORT,
+        names: [],
+        attributes: {},
+        position: [13, 22, 30]
+      }
+    ],
+    exports: []
+  })
+})
+
 test("/* require('id') */", (t) => {
   t.alike(lex("/* require('./foo.js') */"), {
     imports: [],
@@ -1682,6 +1811,49 @@ test('comments between tokens', (t) => {
   })
 })
 
+test('vertical tab and form feed as trivia', (t) => {
+  t.alike(lex("require\v('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [0, 10, 18]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("require\f('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [0, 10, 18]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('carriage return as line terminator', (t) => {
+  t.alike(lex('\rrequire("./foo.js")'), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [1, 10, 18]
+      }
+    ],
+    exports: []
+  })
+})
+
 test("'\\\\'; require('id')", (t) => {
   t.alike(lex("'\\\\'; require('./foo.js')"), {
     imports: [
@@ -1708,6 +1880,13 @@ test('escaped quote in specifier', (t) => {
         position: [0, 9, 13]
       }
     ],
+    exports: []
+  })
+})
+
+test('unterminated string in specifier', (t) => {
+  t.alike(lex("require('./foo.js"), {
+    imports: [],
     exports: []
   })
 })
@@ -1826,6 +2005,21 @@ test('division does not swallow require()', (t) => {
         names: [],
         attributes: {},
         position: [22, 31, 39]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('unterminated regex falls back to division', (t) => {
+  t.alike(lex("/ab\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [4, 13, 21]
       }
     ],
     exports: []
@@ -2009,6 +2203,40 @@ test('member access is not require()', (t) => {
   })
 
   t.alike(lex("obj?.require('./foo.js')"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('require member that is not a call is not require()', (t) => {
+  t.alike(lex('require.cache'), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('require.main'), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex("require.addon.notResolve('./foo.bare')"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test('member access is not module.exports', (t) => {
+  t.alike(lex('module.id'), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('module.parent'), {
+    imports: [],
+    exports: []
+  })
+
+  t.alike(lex('module'), {
     imports: [],
     exports: []
   })
@@ -2280,6 +2508,135 @@ test('type alias: typeof import("id")', (t) => {
 test('type alias: import("id").name', (t) => {
   t.alike(lex("type X = import('./foo').Y"), {
     imports: [],
+    exports: []
+  })
+})
+
+test('type annotation with initializer', (t) => {
+  t.alike(lex("const x: Foo = require('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [15, 24, 32]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("const x: import('./skip') = require('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [28, 37, 45]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('type alias with generic parameters', (t) => {
+  t.alike(lex("type X<T> = import('./foo').Y<T>\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [33, 42, 50]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('type alias with function type arrow', (t) => {
+  t.alike(lex("type F = (a: number) => import('./foo')\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [40, 49, 57]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("type F = () => import('./skip')\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [32, 41, 49]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('multi-line union type', (t) => {
+  t.alike(lex("type U =\n  | A\n  | B\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [21, 30, 38]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('string inside skipped type', (t) => {
+  t.alike(lex("type S = \"import('./x')\"\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [25, 34, 42]
+      }
+    ],
+    exports: []
+  })
+})
+
+test('template literal inside skipped type', (t) => {
+  t.alike(lex("type X = `pre ${ { a: 'b' } } post`\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [36, 45, 53]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("type X = `${import('./skip')}`\nrequire('./foo.js')"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [31, 40, 48]
+      }
+    ],
     exports: []
   })
 })
