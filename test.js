@@ -1057,6 +1057,34 @@ test("import 'id'", (t) => {
   })
 })
 
+test("import 'id' with { type: 'name' }", (t) => {
+  t.alike(lex("import './foo.js' with { type: 'script' }"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: [],
+        attributes: { type: 'script' },
+        position: [0, 8, 16]
+      }
+    ],
+    exports: []
+  })
+
+  t.alike(lex("import './foo.js' with { type: 'script', imports: './imports.json' }"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT,
+        names: [],
+        attributes: { type: 'script', imports: './imports.json' },
+        position: [0, 8, 16]
+      }
+    ],
+    exports: []
+  })
+})
+
 test("import * as from 'id'", (t) => {
   t.alike(lex("import * as foo from './foo.js'"), {
     imports: [
