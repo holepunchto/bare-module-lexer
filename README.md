@@ -23,6 +23,7 @@ lex(`
 ```
 
 <!-- bare-refgen:api start -->
+
 ## API
 
 ### Functions
@@ -42,11 +43,11 @@ Lex `input` for import and export statements, returning the detected `imports` a
 
 **Parameters**
 
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `input` | `string \| Buffer` | — | The source to lex, as a string or buffer. |
-| `encoding?` | `BufferEncoding` | — | The encoding of `input` when it is a string. |
-| `opts?` | `object` | — | Reserved; currently unused. |
+| Parameter   | Type               | Default | Description                                  |
+| ----------- | ------------------ | ------- | -------------------------------------------- |
+| `input`     | `string \| Buffer` | —       | The source to lex, as a string or buffer.    |
+| `encoding?` | `BufferEncoding`   | —       | The encoding of `input` when it is a string. |
+| `opts?`     | `object`           | —       | Reserved; currently unused.                  |
 
 **Throws**
 
@@ -82,6 +83,7 @@ interface Export {
 [source](https://github.com/holepunchto/bare-module-lexer/blob/v1.6.2/index.d.ts#L11)
 
 An export detected in the source; `position` holds the offsets `[exportStart, nameStart, nameEnd]`.
+
 <!-- bare-refgen:api end -->
 
 ## License
