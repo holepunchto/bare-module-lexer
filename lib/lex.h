@@ -1311,6 +1311,16 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
         // import ['"]
         else if (c(0) == '\'' || c(0) == '"') {
           if (bare_module_lexer__lex_string(s, n, &i, &ss, &se)) {
+            i = bare_module_lexer__skip_trivia(s, n, i);
+
+            // import ['"][^'"]*['"] with
+            if (bare_module_lexer__at_kw(s, n, i, "with", 4)) {
+              i += 4;
+
+              err = bare_module_lexer__lex_import_attributes(env, &attributes, s, n, i, &i);
+              if (err < 0) goto err;
+            }
+
             err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
             if (err < 0) goto err;
           }
