@@ -1,6 +1,10 @@
 import Buffer, { BufferEncoding } from 'bare-buffer'
 
-/** An import detected in the source. `type` is a combination of the `lex.constants` flags (e.g. `REQUIRE`, `IMPORT`, `DYNAMIC`); `position` holds the offsets `[importStart, specifierStart, specifierEnd]`. */
+/**
+ * An import detected in the source. `type` is a combination of the `lex.constants` flags (e.g.
+ * `REQUIRE`, `IMPORT`, `DYNAMIC`); `position` holds the offsets `[importStart, specifierStart,
+ * specifierEnd]`.
+ */
 interface Import {
   specifier: string
   type: number
@@ -9,7 +13,10 @@ interface Import {
   position: [importStart: number, specifierStart: number, specifierEnd: number]
 }
 
-/** An export detected in the source; `position` holds the offsets `[exportStart, nameStart, nameEnd]`. */
+/**
+ * An export detected in the source; `position` holds the offsets `[exportStart, nameStart,
+ * nameEnd]`.
+ */
 interface Export {
   name: string
   position: [exportStart: number, nameStart: number, nameEnd: number]
