@@ -24,9 +24,7 @@ lex(`
 
 ## API
 
-See the [`bare-module-lexer` reference][reference].
-
-[reference]: https://docs.pears.com/reference/bare/modules/bare-module-lexer
+See the [`bare-module-lexer` reference](https://docs.pears.com/reference/bare/modules/bare-module-lexer).
 
 ## License
 
