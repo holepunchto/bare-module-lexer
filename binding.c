@@ -8,35 +8,6 @@
 #include "lib/lex.h"
 
 static int
-bare_module_lexer__get_buffer_info(js_env_t *env, js_value_t *buffer, void **data, size_t *len) {
-  int err;
-
-  bool is_arraybuffer;
-  err = js_is_arraybuffer(env, buffer, &is_arraybuffer);
-  assert(err == 0);
-
-  if (is_arraybuffer) {
-    err = js_get_arraybuffer_info(env, buffer, data, len);
-    assert(err == 0);
-
-    return 0;
-  }
-
-  bool is_sharedarraybuffer;
-  err = js_is_sharedarraybuffer(env, buffer, &is_sharedarraybuffer);
-  assert(err == 0);
-
-  if (is_sharedarraybuffer) {
-    err = js_get_sharedarraybuffer_info(env, buffer, data, len);
-    assert(err == 0);
-
-    return 0;
-  }
-
-  return -1;
-}
-
-static int
 bare_module_lexer__get_int64(js_env_t *env, js_value_t *value, int64_t *result) {
   int err;
 
@@ -62,14 +33,21 @@ bare_module_lexer_lex(js_env_t *env, js_callback_info_t *info) {
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  void *data;
-  size_t byte_len;
-  if (bare_module_lexer__get_buffer_info(env, argv[0], &data, &byte_len) < 0) {
+  bool is_arraybuffer;
+  err = js_is_arraybuffer(env, argv[0], &is_arraybuffer);
+  assert(err == 0);
+
+  if (!is_arraybuffer) {
     err = js_throw_type_error(env, NULL, "Input must be a buffer");
     assert(err == 0);
 
     return NULL;
   }
+
+  void *data;
+  size_t byte_len;
+  err = js_get_arraybuffer_info(env, argv[0], &data, &byte_len);
+  assert(err == 0);
 
   int64_t offset;
   if (bare_module_lexer__get_int64(env, argv[1], &offset) < 0) {

@@ -2684,26 +2684,13 @@ test('every view lexes its whole byte range', (t) => {
   }
 })
 
-test('input backed by a shared array buffer', (t) => {
+test('input must not be backed by a shared array buffer', (t) => {
   const buffer = new SharedArrayBuffer(24)
   new Uint8Array(buffer).set(Buffer.from("require('./foo.js')"))
 
-  const expected = {
-    imports: [
-      {
-        specifier: './foo.js',
-        type: REQUIRE,
-        names: [],
-        attributes: {},
-        position: [0, 9, 17]
-      }
-    ],
-    exports: []
+  for (const view of [new Uint8Array(buffer), new Uint16Array(buffer), new DataView(buffer)]) {
+    t.exception.all(() => lex(view), /must be a buffer/)
   }
-
-  t.alike(lex(new Uint8Array(buffer)), expected)
-  t.alike(lex(new Uint16Array(buffer)), expected)
-  t.alike(lex(new DataView(buffer)), expected)
 })
 
 test('a view lexes only its own range', (t) => {
@@ -2733,7 +2720,6 @@ test('empty input', (t) => {
   t.alike(lex(Buffer.alloc(0)), { imports: [], exports: [] })
   t.alike(lex(new Uint8Array(0)), { imports: [], exports: [] })
   t.alike(lex(new DataView(new ArrayBuffer(0))), { imports: [], exports: [] })
-  t.alike(lex(new Uint8Array(new SharedArrayBuffer(0))), { imports: [], exports: [] })
   t.alike(lex(''), { imports: [], exports: [] })
 })
 
@@ -2746,6 +2732,7 @@ test('binding requires a buffer', (t) => {
     123,
     {},
     'source',
+    new SharedArrayBuffer(8),
     new Uint8Array(8),
     new DataView(new ArrayBuffer(8))
   ]) {
@@ -2770,23 +2757,23 @@ test('binding requires a numeric offset and length', (t) => {
 test('binding bounds checks the offset and length', (t) => {
   const binding = require('#binding')
 
-  for (const buffer of [new ArrayBuffer(8), new SharedArrayBuffer(8)]) {
-    for (const [offset, length] of [
-      [-1, 0],
-      [0, -1],
-      [0, 9],
-      [8, 1],
-      [9, 0],
-      [4, 5],
-      [Number.MAX_SAFE_INTEGER, 0],
-      [0, Number.MAX_SAFE_INTEGER]
-    ]) {
-      t.exception.all(() => binding.lex(buffer, offset, length), /out of bounds/)
-    }
+  const buffer = new ArrayBuffer(8)
 
-    t.alike(binding.lex(buffer, 0, 8), { imports: [], exports: [] })
-    t.alike(binding.lex(buffer, 8, 0), { imports: [], exports: [] })
+  for (const [offset, length] of [
+    [-1, 0],
+    [0, -1],
+    [0, 9],
+    [8, 1],
+    [9, 0],
+    [4, 5],
+    [Number.MAX_SAFE_INTEGER, 0],
+    [0, Number.MAX_SAFE_INTEGER]
+  ]) {
+    t.exception.all(() => binding.lex(buffer, offset, length), /out of bounds/)
   }
+
+  t.alike(binding.lex(buffer, 0, 8), { imports: [], exports: [] })
+  t.alike(binding.lex(buffer, 8, 0), { imports: [], exports: [] })
 })
 
 test('binding does not run JavaScript while lexing', (t) => {
