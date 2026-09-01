@@ -2640,3 +2640,176 @@ test('template literal inside skipped type', (t) => {
     exports: []
   })
 })
+
+test('input must be a string or buffer', (t) => {
+  for (const input of [undefined, null, 123, {}, [], () => {}, true]) {
+    t.exception.all(() => lex(input), /must be a string or buffer/)
+  }
+})
+
+test('every view lexes its whole byte range', (t) => {
+  const source = Buffer.alloc(24)
+  source.write("require('./foo.js')")
+
+  const expected = {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [0, 9, 17]
+      }
+    ],
+    exports: []
+  }
+
+  const { buffer, byteOffset } = source
+
+  for (const view of [
+    source,
+    new Uint8Array(buffer, byteOffset, 24),
+    new Int8Array(buffer, byteOffset, 24),
+    new Uint8ClampedArray(buffer, byteOffset, 24),
+    new Uint16Array(buffer, byteOffset, 12),
+    new Int16Array(buffer, byteOffset, 12),
+    new Uint32Array(buffer, byteOffset, 6),
+    new Int32Array(buffer, byteOffset, 6),
+    new Float32Array(buffer, byteOffset, 6),
+    new Float64Array(buffer, byteOffset, 3),
+    new BigInt64Array(buffer, byteOffset, 3),
+    new DataView(buffer, byteOffset, 24)
+  ]) {
+    t.alike(lex(view), expected)
+  }
+})
+
+test('input backed by a shared array buffer', (t) => {
+  const buffer = new SharedArrayBuffer(24)
+  new Uint8Array(buffer).set(Buffer.from("require('./foo.js')"))
+
+  const expected = {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [0, 9, 17]
+      }
+    ],
+    exports: []
+  }
+
+  t.alike(lex(new Uint8Array(buffer)), expected)
+  t.alike(lex(new Uint16Array(buffer)), expected)
+  t.alike(lex(new DataView(buffer)), expected)
+})
+
+test('a view lexes only its own range', (t) => {
+  const buffer = Buffer.from("require('./before.js')require('./foo.js')require('./after.js')")
+
+  const offset = "require('./before.js')".length
+  const length = "require('./foo.js')".length
+
+  const expected = {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE,
+        names: [],
+        attributes: {},
+        position: [0, 9, 17]
+      }
+    ],
+    exports: []
+  }
+
+  t.alike(lex(new Uint8Array(buffer.buffer, buffer.byteOffset + offset, length)), expected)
+  t.alike(lex(new DataView(buffer.buffer, buffer.byteOffset + offset, length)), expected)
+})
+
+test('empty input', (t) => {
+  t.alike(lex(Buffer.alloc(0)), { imports: [], exports: [] })
+  t.alike(lex(new Uint8Array(0)), { imports: [], exports: [] })
+  t.alike(lex(new DataView(new ArrayBuffer(0))), { imports: [], exports: [] })
+  t.alike(lex(new Uint8Array(new SharedArrayBuffer(0))), { imports: [], exports: [] })
+  t.alike(lex(''), { imports: [], exports: [] })
+})
+
+test('binding requires a buffer', (t) => {
+  const binding = require('#binding')
+
+  for (const buffer of [
+    undefined,
+    null,
+    123,
+    {},
+    'source',
+    new Uint8Array(8),
+    new DataView(new ArrayBuffer(8))
+  ]) {
+    t.exception.all(() => binding.lex(buffer, 0, 8), /must be a buffer/)
+  }
+})
+
+test('binding requires a numeric offset and length', (t) => {
+  const binding = require('#binding')
+
+  const buffer = new ArrayBuffer(8)
+
+  for (const offset of [undefined, null, {}, '0', () => {}]) {
+    t.exception.all(() => binding.lex(buffer, offset, 8), /Offset must be a number/)
+  }
+
+  for (const length of [undefined, null, {}, '8', () => {}]) {
+    t.exception.all(() => binding.lex(buffer, 0, length), /Length must be a number/)
+  }
+})
+
+test('binding bounds checks the offset and length', (t) => {
+  const binding = require('#binding')
+
+  for (const buffer of [new ArrayBuffer(8), new SharedArrayBuffer(8)]) {
+    for (const [offset, length] of [
+      [-1, 0],
+      [0, -1],
+      [0, 9],
+      [8, 1],
+      [9, 0],
+      [4, 5],
+      [Number.MAX_SAFE_INTEGER, 0],
+      [0, Number.MAX_SAFE_INTEGER]
+    ]) {
+      t.exception.all(() => binding.lex(buffer, offset, length), /out of bounds/)
+    }
+
+    t.alike(binding.lex(buffer, 0, 8), { imports: [], exports: [] })
+    t.alike(binding.lex(buffer, 8, 0), { imports: [], exports: [] })
+  }
+})
+
+test('binding does not run JavaScript while lexing', (t) => {
+  const binding = require('#binding')
+
+  const trap = new Proxy(
+    {},
+    {
+      get: () => t.fail('trap ran'),
+      has: () => t.fail('trap ran')
+    }
+  )
+
+  t.exception.all(() => binding.lex(trap, 0, 8), /must be a buffer/)
+  t.exception.all(() => binding.lex(new ArrayBuffer(8), trap, 8), /Offset must be a number/)
+  t.exception.all(() => binding.lex(new ArrayBuffer(8), 0, trap), /Length must be a number/)
+})
+
+test('a detached array buffer lexes as empty', (t) => {
+  const buffer = new ArrayBuffer(8)
+  const view = new Uint8Array(buffer)
+
+  structuredClone(buffer, { transfer: [buffer] })
+
+  t.alike(lex(view), { imports: [], exports: [] })
+})

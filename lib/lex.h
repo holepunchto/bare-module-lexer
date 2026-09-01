@@ -81,7 +81,7 @@ bare_module_lexer__add_position(js_env_t *env, js_value_t *entry, size_t stateme
     err = js_create_int64(env, n, &val); \
     assert(err == 0); \
     err = js_set_element(env, position, i, val); \
-    assert(err == 0); \
+    if (err < 0) return err; \
   }
 
   V(0, statement_start);
@@ -90,7 +90,7 @@ bare_module_lexer__add_position(js_env_t *env, js_value_t *entry, size_t stateme
 #undef V
 
   err = js_set_named_property(env, entry, "position", position);
-  assert(err == 0);
+  if (err < 0) return err;
 
   return 0;
 }
@@ -106,15 +106,15 @@ bare_module_lexer__add_import(js_env_t *env, js_value_t *imports, uint32_t *i, c
   assert(err == 0);
 
   err = js_set_element(env, imports, *i, entry);
-  assert(err == 0);
+  if (err < 0) return err;
 
 #define V(key, fn, ...) \
   { \
     js_value_t *val; \
     err = fn(env, __VA_ARGS__, &val); \
-    assert(err == 0); \
+    if (err < 0) return err; \
     err = js_set_named_property(env, entry, key, val); \
-    assert(err == 0); \
+    if (err < 0) return err; \
   }
 
   V("specifier", js_create_string_utf8, &source[specifier_start], specifier_end - specifier_start);
@@ -127,7 +127,7 @@ bare_module_lexer__add_import(js_env_t *env, js_value_t *imports, uint32_t *i, c
   }
 
   err = js_set_named_property(env, entry, "names", names);
-  assert(err == 0);
+  if (err < 0) return err;
 
   if (attributes == NULL) {
     err = js_create_object(env, &attributes);
@@ -135,10 +135,10 @@ bare_module_lexer__add_import(js_env_t *env, js_value_t *imports, uint32_t *i, c
   }
 
   err = js_set_named_property(env, entry, "attributes", attributes);
-  assert(err == 0);
+  if (err < 0) return err;
 
   err = bare_module_lexer__add_position(env, entry, import_start, specifier_start, specifier_end);
-  assert(err == 0);
+  if (err < 0) return err;
 
   *i += 1;
 
@@ -156,22 +156,22 @@ bare_module_lexer__add_export(js_env_t *env, js_value_t *exports, uint32_t *i, c
   assert(err == 0);
 
   err = js_set_element(env, exports, *i, entry);
-  assert(err == 0);
+  if (err < 0) return err;
 
 #define V(key, fn, ...) \
   { \
     js_value_t *val; \
     err = fn(env, __VA_ARGS__, &val); \
-    assert(err == 0); \
+    if (err < 0) return err; \
     err = js_set_named_property(env, entry, key, val); \
-    assert(err == 0); \
+    if (err < 0) return err; \
   }
 
   V("name", js_create_string_utf8, &source[name_start], name_end - name_start);
 #undef V
 
   err = bare_module_lexer__add_position(env, entry, export_start, name_start, name_end);
-  assert(err == 0);
+  if (err < 0) return err;
 
   *i += 1;
 
@@ -191,10 +191,10 @@ bare_module_lexer__add_name(js_env_t *env, js_value_t **names, uint32_t *i, cons
 
   js_value_t *string;
   err = js_create_string_utf8(env, name, name_len, &string);
-  assert(err == 0);
+  if (err < 0) return err;
 
   err = js_set_element(env, *names, *i, string);
-  assert(err == 0);
+  if (err < 0) return err;
 
   *i += 1;
 
@@ -212,14 +212,14 @@ bare_module_lexer__add_attribute(js_env_t *env, js_value_t **attributes, const u
 
   js_value_t *property;
   err = js_create_property_key_utf8(env, key, key_len, &property);
-  assert(err == 0);
+  if (err < 0) return err;
 
   js_value_t *string;
   err = js_create_string_utf8(env, value, value_len, &string);
-  assert(err == 0);
+  if (err < 0) return err;
 
   err = js_set_property(env, *attributes, property, string);
-  assert(err == 0);
+  if (err < 0) return err;
 
   return 0;
 }
@@ -340,7 +340,7 @@ bare_module_lexer__lex_template(const utf8_t *s, size_t n, size_t *result) {
 // tracked by brace counting only, which is good enough for a skip.
 static inline size_t
 bare_module_lexer__skip_template(const utf8_t *s, size_t n, size_t i) {
-  int braces = 0;
+  size_t braces = 0;
   bool subst = false;
 
   i++;
@@ -382,7 +382,7 @@ bare_module_lexer__skip_template(const utf8_t *s, size_t n, size_t i) {
     i++;
   }
 
-  return i;
+  return i > n ? n : i;
 }
 
 // Skip a property value expression inside an object literal: Everything up
@@ -390,7 +390,7 @@ bare_module_lexer__skip_template(const utf8_t *s, size_t n, size_t i) {
 // templates, comments, and nested brackets are skipped wholesale.
 static inline size_t
 bare_module_lexer__skip_value(const utf8_t *s, size_t n, size_t i) {
-  int depth = 0;
+  size_t depth = 0;
 
   while (i < n) {
     uint8_t ch = u(0);
@@ -488,8 +488,8 @@ bare_module_lexer__type_continues(uint8_t last, uint8_t next) {
 // an enclosing list, on a non-continuing line terminator, or at end of input.
 static inline size_t
 bare_module_lexer__skip_type(const utf8_t *s, size_t n, size_t i) {
-  int depth = 0; // () [] {} nesting
-  int angle = 0; // <> nesting
+  size_t depth = 0; // () [] {} nesting
+  size_t angle = 0; // <> nesting
 
   uint8_t last = 0; // Previous significant byte, for ASI continuation
 
@@ -553,7 +553,7 @@ bare_module_lexer__skip_type(const utf8_t *s, size_t n, size_t i) {
     }
 
     if (ch == '(' || ch == '[' || ch == '{') depth++;
-    else if (ch == ')' || ch == ']' || ch == '}') depth--;
+    else if ((ch == ')' || ch == ']' || ch == '}') && depth > 0) depth--;
     else if (ch == '<') angle++;
     else if (ch == '>' && angle > 0) angle--;
 
@@ -942,7 +942,7 @@ bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t 
         value = true;
 
         err = bare_module_lexer__add_name(env, names, nl, &s[ns], ne - ns);
-        assert(err == 0);
+        if (err < 0) return err;
       }
 
       i = bare_module_lexer__skip_trivia(s, n, i);
@@ -1100,6 +1100,12 @@ bare_module_lexer__lex_call(js_env_t *env, js_value_t **attributes, const utf8_t
   return 0;
 }
 
+// Lex `s` into the `imports` and `exports` arrays. The input is borrowed for
+// the duration, so nothing here may run JavaScript; the entries are plain
+// arrays, objects, and strings, none of which invoke an accessor or a proxy
+// trap. Introducing a call that can, such as reading a property off a value
+// from JavaScript, would let a resizable backing store be detached or moved
+// while `s` still points into it.
 static inline int
 bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, const utf8_t *s, size_t n) {
   int err;
@@ -1135,27 +1141,27 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
   // entered, so the matching '}' can resume template content scanning.
   size_t template_stack[BARE_MODULE_LEXER__TEMPLATE_DEPTH];
   int template_depth = 0;
-  int brace_depth = 0;
-  int paren_depth = 0;
-  int bracket_depth = 0;
+  size_t brace_depth = 0;
+  size_t paren_depth = 0;
+  size_t bracket_depth = 0;
 
   // An exported declarator list ('export const a = 1, b = 2') whose
   // initializer is being lexed as ordinary code. The list resumes at the
   // next ',' at the recorded depths, so initializers may contain require()
   // and import() and still be seen.
   bool declarators = false;
-  int d_brace = 0;
-  int d_paren = 0;
-  int d_bracket = 0;
+  size_t d_brace = 0;
+  size_t d_paren = 0;
+  size_t d_bracket = 0;
 
   // A 'module.exports = { ... }' object literal whose property values are
   // being lexed as ordinary code. The property list resumes at the next ','
   // at the recorded depths, so values may contain require() and import()
   // and still be seen.
   bool properties = false;
-  int p_brace = 0;
-  int p_paren = 0;
-  int p_bracket = 0;
+  size_t p_brace = 0;
+  size_t p_paren = 0;
+  size_t p_bracket = 0;
 
   while (i < n) {
     size_t j = bare_module_lexer__skip_trivia(s, n, i);
@@ -1286,7 +1292,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
               i += 4;
 
               err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*", -1);
-              assert(err == 0);
+              if (err < 0) goto err;
 
               goto from;
             }
@@ -1395,7 +1401,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
               i += 4;
 
               err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
-              assert(err == 0);
+              if (err < 0) goto err;
 
               goto from;
             }
@@ -1409,7 +1415,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
               // import [^\s,]+, {
               if (c(0) == '{') {
                 err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
-                assert(err == 0);
+                if (err < 0) goto err;
 
                 err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i, NULL);
                 if (err < 0) goto err;
@@ -1444,10 +1450,10 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
                     i += 4;
 
                     err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
-                    assert(err == 0);
+                    if (err < 0) goto err;
 
                     err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*", -1);
-                    assert(err == 0);
+                    if (err < 0) goto err;
 
                     goto from;
                   }
@@ -1526,7 +1532,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
               i += 4;
 
               err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*", -1);
-              assert(err == 0);
+              if (err < 0) goto err;
 
               goto from;
             }
@@ -1540,7 +1546,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
             i += 4;
 
             err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*", -1);
-            assert(err == 0);
+            if (err < 0) goto err;
 
             goto from;
           }
