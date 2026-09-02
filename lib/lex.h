@@ -1155,8 +1155,8 @@ bare_module_lexer__lex(bare_module_lexer_t *ctx, const utf8_t *s, size_t n) {
 
   size_t i = 0;
 
-  size_t is; // Import start
-  size_t es; // Export start
+  size_t is;     // Import start
+  size_t es = 0; // Export start
 
   size_t ss; // Source start
   size_t se; // Source end
@@ -1166,8 +1166,10 @@ bare_module_lexer__lex(bare_module_lexer_t *ctx, const utf8_t *s, size_t n) {
   // The start of the current import's windows into the context's name and
   // attribute arrays. Anything appended by an attempt that goes on to emit no
   // import is left orphaned below the next attempt's mark, never inside it.
-  uint32_t names;
-  uint32_t attributes;
+  // Both are marked at every keyword, but the labels below are reached by
+  // enough paths that a zero start is worth having rather than proving.
+  uint32_t names = 0;
+  uint32_t attributes = 0;
 
   bool matched;
 

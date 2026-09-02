@@ -60,7 +60,7 @@ bare_module_lexer__create_strings(js_env_t *env, const bare_module_lexer_t *ctx,
   if (len <= BARE_MODULE_LEXER__INLINE_STRINGS) {
     data = result->data_inline;
   } else {
-    data = malloc(len * sizeof(js_value_t *));
+    data = calloc(len, sizeof(js_value_t *));
 
     if (data == NULL) return -1;
   }
