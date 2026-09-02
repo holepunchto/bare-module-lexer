@@ -2,9 +2,10 @@
 #define BARE_MODULE_LEXER_H
 
 #include <assert.h>
-#include <js.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <utf.h>
 
@@ -67,163 +68,205 @@ bare_module_lexer__is_id_like_start(uint8_t c) {
   return bare_module_lexer__is_id_start(c) || c >= 0x80;
 }
 
-static inline int
-bare_module_lexer__add_position(js_env_t *env, js_value_t *entry, size_t statement_start, size_t input_start, size_t input_end) {
-  int err;
+// A recorded range of the input, as a pair of byte offsets.
+typedef struct {
+  uint32_t start;
+  uint32_t end;
+} bare_module_lexer_range_t;
 
-  js_value_t *position;
-  err = js_create_array_with_length(env, 3, &position);
-  assert(err == 0);
+// An imported or re-exported binding name. Most name the input directly, but
+// the default and namespace bindings of an 'import x from' or 'import * as x'
+// have no name in the source and are recorded as their own types.
+enum {
+  bare_module_lexer__name_range = 0,
+  bare_module_lexer__name_star = 1,
+  bare_module_lexer__name_default = 2,
+};
 
-#define V(i, n) \
+typedef struct {
+  int type;
+  bare_module_lexer_range_t range;
+} bare_module_lexer_name_t;
+
+typedef struct {
+  bare_module_lexer_range_t key;
+  bare_module_lexer_range_t value;
+} bare_module_lexer_attribute_t;
+
+// An import's names and attributes are the windows [names, names + names_len)
+// and [attributes, attributes + attributes_len) of the context's own arrays.
+typedef struct {
+  uint32_t statement;
+  bare_module_lexer_range_t specifier;
+  int type;
+  uint32_t names;
+  uint32_t names_len;
+  uint32_t attributes;
+  uint32_t attributes_len;
+} bare_module_lexer_import_t;
+
+typedef struct {
+  uint32_t statement;
+  bare_module_lexer_range_t name;
+} bare_module_lexer_export_t;
+
+// Inline capacity for each array, sized from what modules actually contain so
+// that the common case is lexed without touching the heap. Outgrowing one moves
+// that array, and only that array, to the heap.
+#define BARE_MODULE_LEXER__INLINE_IMPORTS    16
+#define BARE_MODULE_LEXER__INLINE_EXPORTS    32
+#define BARE_MODULE_LEXER__INLINE_NAMES      32
+#define BARE_MODULE_LEXER__INLINE_ATTRIBUTES 4
+
+// The context points into itself while an array is still inline, so it must be
+// passed by reference and never copied once initialized.
+typedef struct {
+  bare_module_lexer_import_t *imports;
+  uint32_t imports_len;
+  uint32_t imports_cap;
+
+  bare_module_lexer_export_t *exports;
+  uint32_t exports_len;
+  uint32_t exports_cap;
+
+  bare_module_lexer_name_t *names;
+  uint32_t names_len;
+  uint32_t names_cap;
+
+  bare_module_lexer_attribute_t *attributes;
+  uint32_t attributes_len;
+  uint32_t attributes_cap;
+
+  bare_module_lexer_import_t imports_inline[BARE_MODULE_LEXER__INLINE_IMPORTS];
+  bare_module_lexer_export_t exports_inline[BARE_MODULE_LEXER__INLINE_EXPORTS];
+  bare_module_lexer_name_t names_inline[BARE_MODULE_LEXER__INLINE_NAMES];
+  bare_module_lexer_attribute_t attributes_inline[BARE_MODULE_LEXER__INLINE_ATTRIBUTES];
+} bare_module_lexer_t;
+
+// The inline arrays are left uninitialized: only the entries below each length
+// are ever read.
+static inline void
+bare_module_lexer_init(bare_module_lexer_t *ctx) {
+#define V(name) \
   { \
-    js_value_t *val; \
-    err = js_create_int64(env, n, &val); \
-    assert(err == 0); \
-    err = js_set_element(env, position, i, val); \
-    if (err < 0) return err; \
+    ctx->name = ctx->name##_inline; \
+    ctx->name##_len = 0; \
+    ctx->name##_cap = sizeof(ctx->name##_inline) / sizeof(ctx->name##_inline[0]); \
   }
 
-  V(0, statement_start);
-  V(1, input_start);
-  V(2, input_end);
+  V(imports);
+  V(exports);
+  V(names);
+  V(attributes);
 #undef V
+}
 
-  err = js_set_named_property(env, entry, "position", position);
-  if (err < 0) return err;
+static inline void
+bare_module_lexer_destroy(bare_module_lexer_t *ctx) {
+#define V(name) \
+  if (ctx->name != ctx->name##_inline) free(ctx->name);
+
+  V(imports);
+  V(exports);
+  V(names);
+  V(attributes);
+#undef V
+}
+
+static inline int
+bare_module_lexer__reserve(void **data, uint32_t len, uint32_t *cap, size_t size, const void *inlined) {
+  if (len < *cap) return 0;
+
+  if (*cap > UINT32_MAX / 2) return -1;
+
+  uint32_t next = *cap * 2;
+
+  void *result;
+
+  if (*data == inlined) {
+    result = malloc((size_t) next * size);
+
+    if (result == NULL) return -1;
+
+    memcpy(result, *data, (size_t) *cap * size);
+  } else {
+    result = realloc(*data, (size_t) next * size);
+
+    if (result == NULL) return -1;
+  }
+
+  *data = result;
+  *cap = next;
 
   return 0;
 }
 
 static inline int
-bare_module_lexer__add_import(js_env_t *env, js_value_t *imports, uint32_t *i, const utf8_t *source, size_t import_start, size_t specifier_start, size_t specifier_end, int type, js_value_t *names, js_value_t *attributes) {
+bare_module_lexer__add_import(bare_module_lexer_t *ctx, size_t statement, size_t specifier_start, size_t specifier_end, int type, uint32_t names, uint32_t attributes) {
   assert(specifier_end >= specifier_start);
 
-  int err;
+  if (bare_module_lexer__reserve((void **) &ctx->imports, ctx->imports_len, &ctx->imports_cap, sizeof(bare_module_lexer_import_t), ctx->imports_inline) < 0) return -1;
 
-  js_value_t *entry;
-  err = js_create_object(env, &entry);
-  assert(err == 0);
+  bare_module_lexer_import_t *import = &ctx->imports[ctx->imports_len++];
 
-  err = js_set_element(env, imports, *i, entry);
-  if (err < 0) return err;
-
-#define V(key, fn, ...) \
-  { \
-    js_value_t *val; \
-    err = fn(env, __VA_ARGS__, &val); \
-    if (err < 0) return err; \
-    err = js_set_named_property(env, entry, key, val); \
-    if (err < 0) return err; \
-  }
-
-  V("specifier", js_create_string_utf8, &source[specifier_start], specifier_end - specifier_start);
-  V("type", js_create_uint32, type);
-#undef V
-
-  if (names == NULL) {
-    err = js_create_array(env, &names);
-    assert(err == 0);
-  }
-
-  err = js_set_named_property(env, entry, "names", names);
-  if (err < 0) return err;
-
-  if (attributes == NULL) {
-    err = js_create_object(env, &attributes);
-    assert(err == 0);
-  }
-
-  err = js_set_named_property(env, entry, "attributes", attributes);
-  if (err < 0) return err;
-
-  err = bare_module_lexer__add_position(env, entry, import_start, specifier_start, specifier_end);
-  if (err < 0) return err;
-
-  *i += 1;
+  import->statement = (uint32_t) statement;
+  import->specifier.start = (uint32_t) specifier_start;
+  import->specifier.end = (uint32_t) specifier_end;
+  import->type = type;
+  import->names = names;
+  import->names_len = ctx->names_len - names;
+  import->attributes = attributes;
+  import->attributes_len = ctx->attributes_len - attributes;
 
   return 0;
 }
 
 static inline int
-bare_module_lexer__add_export(js_env_t *env, js_value_t *exports, uint32_t *i, const utf8_t *source, size_t export_start, size_t name_start, size_t name_end) {
+bare_module_lexer__add_export(bare_module_lexer_t *ctx, size_t statement, size_t name_start, size_t name_end) {
   assert(name_end >= name_start);
 
-  int err;
+  if (bare_module_lexer__reserve((void **) &ctx->exports, ctx->exports_len, &ctx->exports_cap, sizeof(bare_module_lexer_export_t), ctx->exports_inline) < 0) return -1;
 
-  js_value_t *entry;
-  err = js_create_object(env, &entry);
-  assert(err == 0);
+  bare_module_lexer_export_t *export = &ctx->exports[ctx->exports_len++];
 
-  err = js_set_element(env, exports, *i, entry);
-  if (err < 0) return err;
-
-#define V(key, fn, ...) \
-  { \
-    js_value_t *val; \
-    err = fn(env, __VA_ARGS__, &val); \
-    if (err < 0) return err; \
-    err = js_set_named_property(env, entry, key, val); \
-    if (err < 0) return err; \
-  }
-
-  V("name", js_create_string_utf8, &source[name_start], name_end - name_start);
-#undef V
-
-  err = bare_module_lexer__add_position(env, entry, export_start, name_start, name_end);
-  if (err < 0) return err;
-
-  *i += 1;
+  export->statement = (uint32_t) statement;
+  export->name.start = (uint32_t) name_start;
+  export->name.end = (uint32_t) name_end;
 
   return 0;
 }
 
 static inline int
-bare_module_lexer__add_name(js_env_t *env, js_value_t **names, uint32_t *i, const utf8_t *name, size_t name_len) {
-  int err;
+bare_module_lexer__add_name(bare_module_lexer_t *ctx, int type, size_t start, size_t end) {
+  assert(end >= start);
 
-  if (*names == NULL) {
-    err = js_create_array(env, names);
-    assert(err == 0);
+  if (bare_module_lexer__reserve((void **) &ctx->names, ctx->names_len, &ctx->names_cap, sizeof(bare_module_lexer_name_t), ctx->names_inline) < 0) return -1;
 
-    *i = 0;
-  }
+  bare_module_lexer_name_t *name = &ctx->names[ctx->names_len++];
 
-  js_value_t *string;
-  err = js_create_string_utf8(env, name, name_len, &string);
-  if (err < 0) return err;
-
-  err = js_set_element(env, *names, *i, string);
-  if (err < 0) return err;
-
-  *i += 1;
+  name->type = type;
+  name->range.start = (uint32_t) start;
+  name->range.end = (uint32_t) end;
 
   return 0;
 }
 
 static inline int
-bare_module_lexer__add_attribute(js_env_t *env, js_value_t **attributes, const utf8_t *key, size_t key_len, const utf8_t *value, size_t value_len) {
-  int err;
+bare_module_lexer__add_attribute(bare_module_lexer_t *ctx, size_t key_start, size_t key_end, size_t value_start, size_t value_end) {
+  assert(key_end >= key_start);
+  assert(value_end >= value_start);
 
-  if (*attributes == NULL) {
-    err = js_create_object(env, attributes);
-    assert(err == 0);
-  }
+  if (bare_module_lexer__reserve((void **) &ctx->attributes, ctx->attributes_len, &ctx->attributes_cap, sizeof(bare_module_lexer_attribute_t), ctx->attributes_inline) < 0) return -1;
 
-  js_value_t *property;
-  err = js_create_property_key_utf8(env, key, key_len, &property);
-  if (err < 0) return err;
+  bare_module_lexer_attribute_t *attribute = &ctx->attributes[ctx->attributes_len++];
 
-  js_value_t *string;
-  err = js_create_string_utf8(env, value, value_len, &string);
-  if (err < 0) return err;
-
-  err = js_set_property(env, *attributes, property, string);
-  if (err < 0) return err;
+  attribute->key.start = (uint32_t) key_start;
+  attribute->key.end = (uint32_t) key_end;
+  attribute->value.start = (uint32_t) value_start;
+  attribute->value.end = (uint32_t) value_end;
 
   return 0;
 }
-
 // Current character, unchecked
 #define u(offset) ((uint8_t) s[i + offset])
 
@@ -573,7 +616,7 @@ bare_module_lexer__skip_type(const utf8_t *s, size_t n, size_t i) {
 // computed keys and patterns nested deeper than the cap have their entries
 // skipped wholesale.
 static inline int
-bare_module_lexer__lex_pattern(js_env_t *env, js_value_t *exports, uint32_t *el, const utf8_t *s, size_t n, size_t es, size_t *result, int depth) {
+bare_module_lexer__lex_pattern(bare_module_lexer_t *ctx, const utf8_t *s, size_t n, size_t es, size_t *result, int depth) {
   int err;
 
   size_t i = *result;
@@ -606,7 +649,7 @@ bare_module_lexer__lex_pattern(js_env_t *env, js_value_t *exports, uint32_t *el,
 
         while (i < n && idl(u(0))) i++;
 
-        err = bare_module_lexer__add_export(env, exports, el, s, es, ns, i);
+        err = bare_module_lexer__add_export(ctx, es, ns, i);
         if (err < 0) return err;
       }
 
@@ -629,7 +672,7 @@ bare_module_lexer__lex_pattern(js_env_t *env, js_value_t *exports, uint32_t *el,
 
         if (i < n && (u(0) == '{' || u(0) == '[')) {
           if (depth < BARE_MODULE_LEXER__PATTERN_DEPTH) {
-            err = bare_module_lexer__lex_pattern(env, exports, el, s, n, es, &i, depth + 1);
+            err = bare_module_lexer__lex_pattern(ctx, s, n, es, &i, depth + 1);
             if (err < 0) return err;
           } else {
             i = bare_module_lexer__skip_value(s, n, i);
@@ -641,14 +684,14 @@ bare_module_lexer__lex_pattern(js_env_t *env, js_value_t *exports, uint32_t *el,
 
           ne = i;
 
-          err = bare_module_lexer__add_export(env, exports, el, s, es, ns, ne);
+          err = bare_module_lexer__add_export(ctx, es, ns, ne);
           if (err < 0) return err;
         }
       }
 
       // Shorthand binding.
       else {
-        err = bare_module_lexer__add_export(env, exports, el, s, es, ns, ne);
+        err = bare_module_lexer__add_export(ctx, es, ns, ne);
         if (err < 0) return err;
       }
 
@@ -665,7 +708,7 @@ bare_module_lexer__lex_pattern(js_env_t *env, js_value_t *exports, uint32_t *el,
     // Nested pattern as an array element.
     if (!object && (u(0) == '{' || u(0) == '[')) {
       if (depth < BARE_MODULE_LEXER__PATTERN_DEPTH) {
-        err = bare_module_lexer__lex_pattern(env, exports, el, s, n, es, &i, depth + 1);
+        err = bare_module_lexer__lex_pattern(ctx, s, n, es, &i, depth + 1);
         if (err < 0) return err;
       } else {
         i = bare_module_lexer__skip_value(s, n, i);
@@ -837,7 +880,7 @@ bare_module_lexer__lex_type_modifier(const utf8_t *s, size_t n, size_t i) {
 }
 
 static inline int
-bare_module_lexer__lex_import_attributes(js_env_t *env, js_value_t **attributes, const utf8_t *s, size_t n, size_t i, size_t *result) {
+bare_module_lexer__lex_import_attributes(bare_module_lexer_t *ctx, const utf8_t *s, size_t n, size_t i, size_t *result) {
   int err;
 
   size_t ks; // Key start
@@ -876,7 +919,7 @@ bare_module_lexer__lex_import_attributes(js_env_t *env, js_value_t **attributes,
 
       if (!bare_module_lexer__lex_string(s, n, &i, &vs, &ve)) break;
 
-      err = bare_module_lexer__add_attribute(env, attributes, &s[ks], ke - ks, &s[vs], ve - vs);
+      err = bare_module_lexer__add_attribute(ctx, ks, ke, vs, ve);
       if (err < 0) return err;
 
       i = bare_module_lexer__skip_trivia(s, n, i);
@@ -900,7 +943,7 @@ bare_module_lexer__lex_import_attributes(js_env_t *env, js_value_t **attributes,
 // import. *only_type may be NULL when the caller has a value binding of its
 // own (a default or namespace import) and so never erases.
 static inline int
-bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t *nl, const utf8_t *s, size_t n, size_t i, size_t *result, bool *only_type) {
+bare_module_lexer__lex_import_names(bare_module_lexer_t *ctx, const utf8_t *s, size_t n, size_t i, size_t *result, bool *only_type) {
   int err;
 
   size_t ns; // Name start
@@ -941,7 +984,7 @@ bare_module_lexer__lex_import_names(js_env_t *env, js_value_t **names, uint32_t 
       if (!is_type) {
         value = true;
 
-        err = bare_module_lexer__add_name(env, names, nl, &s[ns], ne - ns);
+        err = bare_module_lexer__add_name(ctx, bare_module_lexer__name_range, ns, ne);
         if (err < 0) return err;
       }
 
@@ -1024,7 +1067,7 @@ bare_module_lexer__lex_base(const utf8_t *s, size_t n, size_t i, int type) {
 // argument is a base URL rather than an options object, and the call matches
 // only when that base is the referring module itself.
 static inline int
-bare_module_lexer__lex_call(js_env_t *env, js_value_t **attributes, const utf8_t *s, size_t n, size_t *result, size_t *ss, size_t *se, int type, bool *matched) {
+bare_module_lexer__lex_call(bare_module_lexer_t *ctx, const utf8_t *s, size_t n, size_t *result, size_t *ss, size_t *se, int type, bool *matched) {
   int err;
 
   size_t i = *result;
@@ -1077,7 +1120,7 @@ bare_module_lexer__lex_call(js_env_t *env, js_value_t **attributes, const utf8_t
               p = bare_module_lexer__skip_trivia(s, n, p + 4);
 
               if (p < n && s[p] == ':') {
-                err = bare_module_lexer__lex_import_attributes(env, attributes, s, n, p + 1, &i);
+                err = bare_module_lexer__lex_import_attributes(ctx, s, n, p + 1, &i);
                 if (err < 0) return err;
               }
             }
@@ -1100,33 +1143,31 @@ bare_module_lexer__lex_call(js_env_t *env, js_value_t **attributes, const utf8_t
   return 0;
 }
 
-// Lex `s` into the `imports` and `exports` arrays. The input is borrowed for
-// the duration, so nothing here may run JavaScript; the entries are plain
-// arrays, objects, and strings, none of which invoke an accessor or a proxy
-// trap. Introducing a call that can, such as reading a property off a value
-// from JavaScript, would let a resizable backing store be detached or moved
-// while `s` still points into it.
+// Lex `s` into `ctx`, recording what is found as ranges of the input on the C
+// heap. `s` is borrowed from JavaScript, so it stays valid only for as long as
+// no JavaScript runs: a backing store can be detached or resized from under it
+// by anything that reaches an accessor or a proxy trap. Nothing below can, and
+// nothing that can belongs here - the ranges are turned into JavaScript once
+// the borrow is over. Returns -1 when an allocation fails.
 static inline int
-bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, const utf8_t *s, size_t n) {
+bare_module_lexer__lex(bare_module_lexer_t *ctx, const utf8_t *s, size_t n) {
   int err;
 
   size_t i = 0;
 
-  size_t is;       // Import start
-  uint32_t il = 0; // Import count
-
-  size_t es;       // Export start
-  uint32_t el = 0; // Export count
+  size_t is; // Import start
+  size_t es; // Export start
 
   size_t ss; // Source start
   size_t se; // Source end
 
   int type;
 
-  js_value_t *names;
-  uint32_t nl; // Names count
-
-  js_value_t *attributes;
+  // The start of the current import's windows into the context's name and
+  // attribute arrays. Anything appended by an attempt that goes on to emit no
+  // import is left orphaned below the next attempt's mark, never inside it.
+  uint32_t names;
+  uint32_t attributes;
 
   bool matched;
 
@@ -1251,8 +1292,8 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       }
 
       type = 0;
-      names = NULL;
-      attributes = NULL;
+      names = ctx->names_len;
+      attributes = ctx->attributes_len;
       type_only = false;
 
       if (bare_module_lexer__match_kw(s, ks, kl, "require", 7)) {
@@ -1291,7 +1332,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
             if (bare_module_lexer__at_kw(s, n, i, "from", 4)) {
               i += 4;
 
-              err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*", -1);
+              err = bare_module_lexer__add_name(ctx, bare_module_lexer__name_star, 0, 0);
               if (err < 0) goto err;
 
               goto from;
@@ -1301,7 +1342,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
         // import {
         else if (c(0) == '{') {
-          err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i, &type_only);
+          err = bare_module_lexer__lex_import_names(ctx, s, n, i, &i, &type_only);
           if (err < 0) goto err;
 
           i = bare_module_lexer__skip_trivia(s, n, i);
@@ -1323,11 +1364,11 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
             if (bare_module_lexer__at_kw(s, n, i, "with", 4)) {
               i += 4;
 
-              err = bare_module_lexer__lex_import_attributes(env, &attributes, s, n, i, &i);
+              err = bare_module_lexer__lex_import_attributes(ctx, s, n, i, &i);
               if (err < 0) goto err;
             }
 
-            err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+            err = bare_module_lexer__add_import(ctx, is, ss, se, type, names, attributes);
             if (err < 0) goto err;
           }
         }
@@ -1336,11 +1377,11 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
         else if (c(0) == '(') {
           type |= bare_module_lexer_dynamic;
 
-          err = bare_module_lexer__lex_call(env, &attributes, s, n, &i, &ss, &se, type, &matched);
+          err = bare_module_lexer__lex_call(ctx, s, n, &i, &ss, &se, type, &matched);
           if (err < 0) goto err;
 
           if (matched) {
-            err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+            err = bare_module_lexer__add_import(ctx, is, ss, se, type, names, attributes);
             if (err < 0) goto err;
           }
         }
@@ -1366,11 +1407,11 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
               i = p;
 
               if (c(0) == '(') {
-                err = bare_module_lexer__lex_call(env, &attributes, s, n, &i, &ss, &se, type, &matched);
+                err = bare_module_lexer__lex_call(ctx, s, n, &i, &ss, &se, type, &matched);
                 if (err < 0) goto err;
 
                 if (matched) {
-                  err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+                  err = bare_module_lexer__add_import(ctx, is, ss, se, type, names, attributes);
                   if (err < 0) goto err;
                 }
 
@@ -1378,7 +1419,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
                 else if (c(0) == ')' && (type & bare_module_lexer_addon)) {
                   ss = se = i++;
 
-                  err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+                  err = bare_module_lexer__add_import(ctx, is, ss, se, type, names, attributes);
                   if (err < 0) goto err;
                 }
               }
@@ -1400,7 +1441,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
             if (bare_module_lexer__at_kw(s, n, i, "from", 4)) {
               i += 4;
 
-              err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
+              err = bare_module_lexer__add_name(ctx, bare_module_lexer__name_default, 0, 0);
               if (err < 0) goto err;
 
               goto from;
@@ -1414,10 +1455,10 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
               // import [^\s,]+, {
               if (c(0) == '{') {
-                err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
+                err = bare_module_lexer__add_name(ctx, bare_module_lexer__name_default, 0, 0);
                 if (err < 0) goto err;
 
-                err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i, NULL);
+                err = bare_module_lexer__lex_import_names(ctx, s, n, i, &i, NULL);
                 if (err < 0) goto err;
 
                 i = bare_module_lexer__skip_trivia(s, n, i);
@@ -1449,10 +1490,10 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
                   if (bare_module_lexer__at_kw(s, n, i, "from", 4)) {
                     i += 4;
 
-                    err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "default", -1);
+                    err = bare_module_lexer__add_name(ctx, bare_module_lexer__name_default, 0, 0);
                     if (err < 0) goto err;
 
-                    err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*", -1);
+                    err = bare_module_lexer__add_name(ctx, bare_module_lexer__name_star, 0, 0);
                     if (err < 0) goto err;
 
                     goto from;
@@ -1531,7 +1572,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
               i += 4;
 
-              err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*", -1);
+              err = bare_module_lexer__add_name(ctx, bare_module_lexer__name_star, 0, 0);
               if (err < 0) goto err;
 
               goto from;
@@ -1545,7 +1586,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
             i += 4;
 
-            err = bare_module_lexer__add_name(env, &names, &nl, (const utf8_t *) "*", -1);
+            err = bare_module_lexer__add_name(ctx, bare_module_lexer__name_star, 0, 0);
             if (err < 0) goto err;
 
             goto from;
@@ -1576,7 +1617,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
               i = bs - 1;
 
-              err = bare_module_lexer__lex_import_names(env, &names, &nl, s, n, i, &i, &type_only);
+              err = bare_module_lexer__lex_import_names(ctx, s, n, i, &i, &type_only);
               if (err < 0) goto err;
 
               i = resume;
@@ -1626,7 +1667,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
                 // A type-only binding is erased - export no name for it.
                 if (!is_type) {
-                  err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+                  err = bare_module_lexer__add_export(ctx, es, ss, se);
                   if (err < 0) goto err;
                 }
               }
@@ -1749,7 +1790,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
           i += 7;
 
-          err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+          err = bare_module_lexer__add_export(ctx, es, ss, se);
           if (err < 0) goto err;
         }
 
@@ -1947,11 +1988,11 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
     // require(\.(resolve|addon(\.resolve)?|asset))?\(
     if (c(0) == '(') {
-      err = bare_module_lexer__lex_call(env, &attributes, s, n, &i, &ss, &se, type, &matched);
+      err = bare_module_lexer__lex_call(ctx, s, n, &i, &ss, &se, type, &matched);
       if (err < 0) goto err;
 
       if (matched) {
-        err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+        err = bare_module_lexer__add_import(ctx, is, ss, se, type, names, attributes);
         if (err < 0) goto err;
       }
 
@@ -1959,7 +2000,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       else if (c(0) == ')' && (type & bare_module_lexer_addon)) {
         ss = se = i++;
 
-        err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+        err = bare_module_lexer__add_import(ctx, is, ss, se, type, names, attributes);
         if (err < 0) goto err;
       }
     }
@@ -2018,7 +2059,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
       if (c(0) == '=') {
         i++;
 
-        err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+        err = bare_module_lexer__add_export(ctx, es, ss, se);
         if (err < 0) goto err;
       }
     }
@@ -2046,7 +2087,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
             if (c(0) == '=') {
               i++;
 
-              err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+              err = bare_module_lexer__add_export(ctx, es, ss, se);
               if (err < 0) goto err;
             }
           }
@@ -2067,13 +2108,13 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
         if (bare_module_lexer__at_kw(s, n, i, "with", 4)) {
           i += 4;
 
-          err = bare_module_lexer__lex_import_attributes(env, &attributes, s, n, i, &i);
+          err = bare_module_lexer__lex_import_attributes(ctx, s, n, i, &i);
           if (err < 0) goto err;
         }
 
         // A type-only specifier list is erased along with its declaration.
         if (!type_only) {
-          err = bare_module_lexer__add_import(env, imports, &il, s, is, ss, se, type, names, attributes);
+          err = bare_module_lexer__add_import(ctx, is, ss, se, type, names, attributes);
           if (err < 0) goto err;
         }
       }
@@ -2092,7 +2133,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       se = i;
 
-      err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+      err = bare_module_lexer__add_export(ctx, es, ss, se);
       if (err < 0) goto err;
     }
 
@@ -2106,7 +2147,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
     // (const|let|var) followed by a destructuring pattern - the bindings
     // are the exported names.
     if (c(0) == '{' || c(0) == '[') {
-      err = bare_module_lexer__lex_pattern(env, exports, &el, s, n, es, &i, 0);
+      err = bare_module_lexer__lex_pattern(ctx, s, n, es, &i, 0);
       if (err < 0) goto err;
     }
 
@@ -2118,7 +2159,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       se = i;
 
-      err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+      err = bare_module_lexer__add_export(ctx, es, ss, se);
       if (err < 0) goto err;
     }
 
@@ -2183,7 +2224,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
         i = bare_module_lexer__skip_trivia(s, n, i);
       }
 
-      err = bare_module_lexer__add_export(env, exports, &el, s, es, ss, se);
+      err = bare_module_lexer__add_export(ctx, es, ss, se);
       if (err < 0) goto err;
 
       // 'name:' - let the outer loop lex the value and resume at the next
@@ -2216,8 +2257,8 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
       if (bare_module_lexer__at_kw(s, n, p, "require", 7)) {
         type = bare_module_lexer_reexport;
-        names = NULL;
-        attributes = NULL;
+        names = ctx->names_len;
+        attributes = ctx->attributes_len;
         is = p;
         i = p + 7;
         prev = bare_module_lexer__prev_expr;
@@ -2238,7 +2279,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
         // '"foo":' (property) or '"foo"(' (method) - both name an export.
         if (c(0) == ':' || c(0) == '(') {
-          err = bare_module_lexer__add_export(env, exports, &el, s, es, ns, ne);
+          err = bare_module_lexer__add_export(ctx, es, ns, ne);
           if (err < 0) goto err;
 
           // Consume the ':' but leave the '(' for the outer loop to lex the
@@ -2277,7 +2318,7 @@ bare_module_lexer__lex(js_env_t *env, js_value_t *imports, js_value_t *exports, 
 
             // '["foo"]:' (property) or '["foo"](' (method).
             if (q < n && (s[q] == ':' || s[q] == '(')) {
-              err = bare_module_lexer__add_export(env, exports, &el, s, es, ns, ne);
+              err = bare_module_lexer__add_export(ctx, es, ns, ne);
               if (err < 0) goto err;
 
               i = s[q] == ':' ? q + 1 : q;
