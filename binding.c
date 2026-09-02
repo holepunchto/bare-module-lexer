@@ -3,6 +3,7 @@
 #include <js.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <uv.h>
 
 #include "lib/lex.h"
@@ -19,6 +20,220 @@ bare_module_lexer__get_int64(js_env_t *env, js_value_t *value, int64_t *result) 
 
   err = js_get_value_int64(env, value, result);
   assert(err == 0);
+
+  return 0;
+}
+
+// The strings of every range the lexer recorded, laid out as one allocation of
+// four sections: an import specifier per import, a name per export, a name per
+// import name, and a key and a value per import attribute.
+// Whatever fits inline in the context fits inline here too.
+#define BARE_MODULE_LEXER__INLINE_STRINGS \
+  (BARE_MODULE_LEXER__INLINE_IMPORTS + \
+   BARE_MODULE_LEXER__INLINE_EXPORTS + \
+   BARE_MODULE_LEXER__INLINE_NAMES + \
+   BARE_MODULE_LEXER__INLINE_ATTRIBUTES * 2)
+
+typedef struct {
+  js_value_t **specifiers;
+  js_value_t **export_names;
+  js_value_t **names;
+  js_value_t **attributes;
+
+  js_value_t **data;
+  js_value_t *data_inline[BARE_MODULE_LEXER__INLINE_STRINGS];
+} bare_module_lexer_strings_t;
+
+// Turn every recorded range into a string. This is the last thing to read the
+// borrowed input, and so the last thing that may not run JavaScript.
+static int
+bare_module_lexer__create_strings(js_env_t *env, const bare_module_lexer_t *ctx, const utf8_t *s, bare_module_lexer_strings_t *result) {
+  int err;
+
+  size_t len = (size_t) ctx->imports_len +
+               (size_t) ctx->exports_len +
+               (size_t) ctx->names_len +
+               (size_t) ctx->attributes_len * 2;
+
+  js_value_t **data;
+
+  if (len <= BARE_MODULE_LEXER__INLINE_STRINGS) {
+    data = result->data_inline;
+  } else {
+    data = malloc(len * sizeof(js_value_t *));
+
+    if (data == NULL) return -1;
+  }
+
+  result->data = data;
+  result->specifiers = data;
+  result->export_names = result->specifiers + ctx->imports_len;
+  result->names = result->export_names + ctx->exports_len;
+  result->attributes = result->names + ctx->names_len;
+
+  for (uint32_t i = 0; i < ctx->imports_len; i++) {
+    const bare_module_lexer_range_t *range = &ctx->imports[i].specifier;
+
+    err = js_create_string_utf8(env, &s[range->start], range->end - range->start, &result->specifiers[i]);
+    if (err < 0) return err;
+  }
+
+  for (uint32_t i = 0; i < ctx->exports_len; i++) {
+    const bare_module_lexer_range_t *range = &ctx->exports[i].name;
+
+    err = js_create_string_utf8(env, &s[range->start], range->end - range->start, &result->export_names[i]);
+    if (err < 0) return err;
+  }
+
+  for (uint32_t i = 0; i < ctx->names_len; i++) {
+    const bare_module_lexer_name_t *name = &ctx->names[i];
+
+    switch (name->type) {
+    case bare_module_lexer__name_star:
+      err = js_create_string_utf8(env, (const utf8_t *) "*", 1, &result->names[i]);
+      break;
+
+    case bare_module_lexer__name_default:
+      err = js_create_string_utf8(env, (const utf8_t *) "default", 7, &result->names[i]);
+      break;
+
+    default:
+      err = js_create_string_utf8(env, &s[name->range.start], name->range.end - name->range.start, &result->names[i]);
+    }
+
+    if (err < 0) return err;
+  }
+
+  for (uint32_t i = 0; i < ctx->attributes_len; i++) {
+    const bare_module_lexer_attribute_t *attribute = &ctx->attributes[i];
+
+    err = js_create_property_key_utf8(env, &s[attribute->key.start], attribute->key.end - attribute->key.start, &result->attributes[i * 2]);
+    if (err < 0) return err;
+
+    err = js_create_string_utf8(env, &s[attribute->value.start], attribute->value.end - attribute->value.start, &result->attributes[i * 2 + 1]);
+    if (err < 0) return err;
+  }
+
+  return 0;
+}
+
+static int
+bare_module_lexer__create_position(js_env_t *env, js_value_t *entry, uint32_t statement, const bare_module_lexer_range_t *range) {
+  int err;
+
+  js_value_t *position;
+  err = js_create_array_with_length(env, 3, &position);
+  assert(err == 0);
+
+#define V(i, n) \
+  { \
+    js_value_t *val; \
+    err = js_create_int64(env, n, &val); \
+    assert(err == 0); \
+    err = js_set_element(env, position, i, val); \
+    if (err < 0) return err; \
+  }
+
+  V(0, statement);
+  V(1, range->start);
+  V(2, range->end);
+#undef V
+
+  return js_set_named_property(env, entry, "position", position);
+}
+
+// Assemble the result from the strings created above. This runs after the
+// borrow is over and takes no input pointer.
+static int
+bare_module_lexer__create_result(js_env_t *env, const bare_module_lexer_t *ctx, const bare_module_lexer_strings_t *strings, js_value_t **result) {
+  int err;
+
+  js_value_t *imports;
+  err = js_create_array_with_length(env, ctx->imports_len, &imports);
+  assert(err == 0);
+
+  for (uint32_t i = 0; i < ctx->imports_len; i++) {
+    const bare_module_lexer_import_t *import = &ctx->imports[i];
+
+    js_value_t *entry;
+    err = js_create_object(env, &entry);
+    assert(err == 0);
+
+    err = js_set_element(env, imports, i, entry);
+    if (err < 0) return err;
+
+    err = js_set_named_property(env, entry, "specifier", strings->specifiers[i]);
+    if (err < 0) return err;
+
+    js_value_t *type;
+    err = js_create_uint32(env, import->type, &type);
+    assert(err == 0);
+
+    err = js_set_named_property(env, entry, "type", type);
+    if (err < 0) return err;
+
+    js_value_t *names;
+    err = js_create_array_with_length(env, import->names_len, &names);
+    assert(err == 0);
+
+    for (uint32_t j = 0; j < import->names_len; j++) {
+      err = js_set_element(env, names, j, strings->names[import->names + j]);
+      if (err < 0) return err;
+    }
+
+    err = js_set_named_property(env, entry, "names", names);
+    if (err < 0) return err;
+
+    js_value_t *attributes;
+    err = js_create_object(env, &attributes);
+    assert(err == 0);
+
+    for (uint32_t j = 0; j < import->attributes_len; j++) {
+      uint32_t k = (import->attributes + j) * 2;
+
+      err = js_set_property(env, attributes, strings->attributes[k], strings->attributes[k + 1]);
+      if (err < 0) return err;
+    }
+
+    err = js_set_named_property(env, entry, "attributes", attributes);
+    if (err < 0) return err;
+
+    err = bare_module_lexer__create_position(env, entry, import->statement, &import->specifier);
+    if (err < 0) return err;
+  }
+
+  js_value_t *exports;
+  err = js_create_array_with_length(env, ctx->exports_len, &exports);
+  assert(err == 0);
+
+  for (uint32_t i = 0; i < ctx->exports_len; i++) {
+    const bare_module_lexer_export_t *export = &ctx->exports[i];
+
+    js_value_t *entry;
+    err = js_create_object(env, &entry);
+    assert(err == 0);
+
+    err = js_set_element(env, exports, i, entry);
+    if (err < 0) return err;
+
+    err = js_set_named_property(env, entry, "name", strings->export_names[i]);
+    if (err < 0) return err;
+
+    err = bare_module_lexer__create_position(env, entry, export->statement, &export->name);
+    if (err < 0) return err;
+  }
+
+  js_value_t *object;
+  err = js_create_object(env, &object);
+  assert(err == 0);
+
+  err = js_set_named_property(env, object, "imports", imports);
+  if (err < 0) return err;
+
+  err = js_set_named_property(env, object, "exports", exports);
+  if (err < 0) return err;
+
+  *result = object;
 
   return 0;
 }
@@ -72,28 +287,49 @@ bare_module_lexer_lex(js_env_t *env, js_callback_info_t *info) {
     return NULL;
   }
 
+  if ((uint64_t) len > UINT32_MAX) {
+    err = js_throw_range_error(env, NULL, "Length is out of bounds");
+    assert(err == 0);
+
+    return NULL;
+  }
+
   utf8_t *input = (utf8_t *) data + offset;
 
-  js_value_t *imports;
-  err = js_create_array(env, &imports);
-  assert(err == 0);
+  bare_module_lexer_t ctx;
+  bare_module_lexer_init(&ctx);
 
-  js_value_t *exports;
-  err = js_create_array(env, &exports);
-  assert(err == 0);
+  bare_module_lexer_strings_t strings = {.data = NULL};
 
-  err = bare_module_lexer__lex(env, imports, exports, input, (size_t) len);
-  if (err < 0) return NULL;
+  js_value_t *result = NULL;
 
-  js_value_t *result;
-  err = js_create_object(env, &result);
-  assert(err == 0);
+  err = bare_module_lexer__lex(&ctx, input, (size_t) len);
+  if (err < 0) goto done;
 
-  err = js_set_named_property(env, result, "imports", imports);
-  if (err < 0) return NULL;
+  err = bare_module_lexer__create_strings(env, &ctx, input, &strings);
+  if (err < 0) goto done;
 
-  err = js_set_named_property(env, result, "exports", exports);
-  if (err < 0) return NULL;
+  // The borrow ends here, nothing below reads `input`.
+
+  err = bare_module_lexer__create_result(env, &ctx, &strings, &result);
+
+done:
+  if (strings.data != strings.data_inline) free(strings.data);
+
+  bare_module_lexer_destroy(&ctx);
+
+  if (err < 0) {
+    bool is_pending;
+    err = js_is_exception_pending(env, &is_pending);
+    assert(err == 0);
+
+    if (!is_pending) {
+      err = js_throw_error(env, uv_err_name(UV_ENOMEM), uv_strerror(UV_ENOMEM));
+      assert(err == 0);
+    }
+
+    return NULL;
+  }
 
   return result;
 }

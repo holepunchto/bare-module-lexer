@@ -2800,3 +2800,57 @@ test('a detached array buffer lexes as empty', (t) => {
 
   t.alike(lex(view), { imports: [], exports: [] })
 })
+
+test('a resized input does not outlive the borrow', (t) => {
+  const binding = require('#binding')
+
+  const len = 1024 * 1024
+
+  const buffer = new ArrayBuffer(len, { maxByteLength: len })
+  const view = new Uint8Array(buffer)
+
+  view.fill(0x20)
+  view.set(Buffer.from("require('./foo.js')"), 0)
+
+  Object.defineProperty(Object.prototype, 'specifier', {
+    configurable: true,
+    set() {
+      buffer.resize(0)
+    }
+  })
+
+  try {
+    binding.lex(buffer, 0, len)
+  } finally {
+    delete Object.prototype.specifier
+  }
+
+  t.pass()
+})
+
+test('a detached input does not outlive the borrow', (t) => {
+  const binding = require('#binding')
+
+  const len = 1024 * 1024
+
+  const buffer = new ArrayBuffer(len)
+  const view = new Uint8Array(buffer)
+
+  view.fill(0x20)
+  view.set(Buffer.from("require('./foo.js')"), 0)
+
+  Object.defineProperty(Object.prototype, 'specifier', {
+    configurable: true,
+    set() {
+      structuredClone(buffer, { transfer: [buffer] })
+    }
+  })
+
+  try {
+    binding.lex(buffer, 0, len)
+  } finally {
+    delete Object.prototype.specifier
+  }
+
+  t.pass()
+})
