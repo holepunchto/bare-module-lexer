@@ -29,6 +29,8 @@ It reaches nothing and keeps nothing.
 
 It is C walking source that an attacker chose, and the module system runs it on code it may not trust, which Bare names as a risky spot. Memory bugs are all there is here.
 
+The input may be shared memory that another thread writes while it is being read, so a shared input is copied before it is lexed. The lexer and the strings it records then read one input that nothing else can reach.
+
 The lexer is heuristic on purpose, trading correctness for speed. The module system is built to cope with a wrong answer, so a missed import is not a security bug.
 
 ## What to report

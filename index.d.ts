@@ -24,7 +24,9 @@ interface Export {
 
 /**
  * Lex `input` for import and export statements, returning the detected `imports` and `exports`.
- * @param input - The source to lex, as a string or buffer.
+ * @param input - The source to lex, as a string or buffer. A buffer backed by a `SharedArrayBuffer`
+ * is copied before it is lexed, so the result describes one input; transfer a plain `ArrayBuffer`
+ * when that copy matters.
  * @param encoding - The encoding of `input` when it is a string.
  * @param opts - Reserved; currently unused.
  * @throws {TypeError} `input` is not a string or buffer.

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <uv.h>
 
 #include "lib/lex.h"
@@ -252,7 +253,11 @@ bare_module_lexer_lex(js_env_t *env, js_callback_info_t *info) {
   err = js_is_arraybuffer(env, argv[0], &is_arraybuffer);
   assert(err == 0);
 
-  if (!is_arraybuffer) {
+  bool is_sharedarraybuffer;
+  err = js_is_sharedarraybuffer(env, argv[0], &is_sharedarraybuffer);
+  assert(err == 0);
+
+  if (!is_arraybuffer && !is_sharedarraybuffer) {
     err = js_throw_type_error(env, NULL, "Input must be a buffer");
     assert(err == 0);
 
@@ -261,7 +266,13 @@ bare_module_lexer_lex(js_env_t *env, js_callback_info_t *info) {
 
   void *data;
   size_t byte_len;
-  err = js_get_arraybuffer_info(env, argv[0], &data, &byte_len);
+
+  if (is_sharedarraybuffer) {
+    err = js_get_sharedarraybuffer_info(env, argv[0], &data, &byte_len);
+  } else {
+    err = js_get_arraybuffer_info(env, argv[0], &data, &byte_len);
+  }
+
   assert(err == 0);
 
   int64_t offset;
@@ -296,6 +307,25 @@ bare_module_lexer_lex(js_env_t *env, js_callback_info_t *info) {
 
   utf8_t *input = (utf8_t *) data + offset;
 
+  // Another thread may write shared memory while we read it, and the lexer and
+  // the strings it records must see one input. Take a private copy instead.
+  utf8_t *copy = NULL;
+
+  if (is_sharedarraybuffer && len > 0) {
+    copy = malloc((size_t) len);
+
+    if (copy == NULL) {
+      err = js_throw_error(env, uv_err_name(UV_ENOMEM), uv_strerror(UV_ENOMEM));
+      assert(err == 0);
+
+      return NULL;
+    }
+
+    memcpy(copy, input, (size_t) len);
+
+    input = copy;
+  }
+
   bare_module_lexer_t ctx;
   bare_module_lexer_init(&ctx);
 
@@ -315,6 +345,8 @@ bare_module_lexer_lex(js_env_t *env, js_callback_info_t *info) {
 
 done:
   if (strings.data != strings.data_inline) free(strings.data);
+
+  free(copy);
 
   bare_module_lexer_destroy(&ctx);
 
