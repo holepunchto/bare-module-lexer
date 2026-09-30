@@ -1056,6 +1056,41 @@ bare_module_lexer__lex_base(const utf8_t *s, size_t n, size_t i, int type) {
   return i;
 }
 
+// Parse the options object '{ with: { ... } }' of a call at *result, which
+// must point at the '{', along with any trailing arguments. On a match, fills
+// any import attributes and leaves the cursor past the ')'.
+static inline int
+bare_module_lexer__lex_options(bare_module_lexer_t *ctx, const utf8_t *s, size_t n, size_t *result, bool *matched) {
+  int err;
+
+  size_t i = *result;
+
+  if (c(0) == '{') {
+    size_t p = bare_module_lexer__skip_trivia(s, n, i + 1);
+
+    if (bare_module_lexer__at_kw(s, n, p, "with", 4)) {
+      p = bare_module_lexer__skip_trivia(s, n, p + 4);
+
+      if (p < n && s[p] == ':') {
+        err = bare_module_lexer__lex_import_attributes(ctx, s, n, p + 1, &i);
+        if (err < 0) return err;
+      }
+    }
+  }
+
+  while (i < n && u(0) != ')') i++;
+
+  if (c(0) == ')') {
+    i++;
+
+    *matched = true;
+  }
+
+  *result = i;
+
+  return 0;
+}
+
 // Parse a call tail '([\s]*<string>[, { with: { ... } }][^)]*)' at *result,
 // which must point at the '('. On a match, fills the specifier bounds and
 // any import attributes and leaves the cursor past the ')'. When the
@@ -1065,7 +1100,9 @@ bare_module_lexer__lex_base(const utf8_t *s, size_t n, size_t i, int type) {
 // For the artifact and resolve variants ('require.asset', 'require.resolve',
 // 'require.addon[.resolve]', and the 'import.meta' equivalents) the second
 // argument is a base URL rather than an options object, and the call matches
-// only when that base is the referring module itself.
+// only when that base is the referring module itself. The module resolve
+// variants ('require.resolve' and 'import.meta.resolve') also take an options
+// object, either in place of the base or following it.
 static inline int
 bare_module_lexer__lex_call(bare_module_lexer_t *ctx, const utf8_t *s, size_t n, size_t *result, size_t *ss, size_t *se, int type, bool *matched) {
   int err;
@@ -1100,6 +1137,8 @@ bare_module_lexer__lex_call(bare_module_lexer_t *ctx, const utf8_t *s, size_t n,
         // any other base is a runtime value, so the call is left unmatched
         // and the argument lexes as ordinary code.
         if (type & (bare_module_lexer_addon | bare_module_lexer_asset | bare_module_lexer_resolve)) {
+          bool options = (type & bare_module_lexer_resolve) && !(type & (bare_module_lexer_addon | bare_module_lexer_asset));
+
           size_t p = bare_module_lexer__lex_base(s, n, i, type);
 
           if (p != i) {
@@ -1109,30 +1148,23 @@ bare_module_lexer__lex_call(bare_module_lexer_t *ctx, const utf8_t *s, size_t n,
               i++;
 
               *matched = true;
-            }
-          }
-        } else {
-          // An options object '{ with: { ... } }'.
-          if (c(0) == '{') {
-            size_t p = bare_module_lexer__skip_trivia(s, n, i + 1);
+            } else if (c(0) == ',' && options) {
+              p = bare_module_lexer__skip_trivia(s, n, i + 1);
 
-            if (bare_module_lexer__at_kw(s, n, p, "with", 4)) {
-              p = bare_module_lexer__skip_trivia(s, n, p + 4);
+              if (p < n && s[p] == '{') {
+                i = p;
 
-              if (p < n && s[p] == ':') {
-                err = bare_module_lexer__lex_import_attributes(ctx, s, n, p + 1, &i);
+                err = bare_module_lexer__lex_options(ctx, s, n, &i, matched);
                 if (err < 0) return err;
               }
             }
+          } else if (c(0) == '{' && options) {
+            err = bare_module_lexer__lex_options(ctx, s, n, &i, matched);
+            if (err < 0) return err;
           }
-
-          while (i < n && u(0) != ')') i++;
-
-          if (c(0) == ')') {
-            i++;
-
-            *matched = true;
-          }
+        } else {
+          err = bare_module_lexer__lex_options(ctx, s, n, &i, matched);
+          if (err < 0) return err;
         }
       }
     }
