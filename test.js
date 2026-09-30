@@ -243,6 +243,82 @@ test("require.resolve('id', __filename)", (t) => {
   })
 })
 
+test("require.resolve('id', { with: { imports: 'id' } })", (t) => {
+  t.alike(lex("require.resolve('./foo.js', { with: { imports: './imports.json' } })"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE | RESOLVE,
+        names: [],
+        attributes: { imports: './imports.json' },
+        position: [0, 17, 25]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("require.resolve('id', __filename, { with: { imports: 'id' } })", (t) => {
+  t.alike(lex("require.resolve('./foo.js', __filename, { with: { imports: './imports.json' } })"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE | RESOLVE,
+        names: [],
+        attributes: { imports: './imports.json' },
+        position: [0, 17, 25]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("require.resolve('id', __filename, {})", (t) => {
+  t.alike(lex("require.resolve('./foo.js', __filename, {})"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: REQUIRE | RESOLVE,
+        names: [],
+        attributes: {},
+        position: [0, 17, 25]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("require.resolve('id', __filename, opts)", (t) => {
+  t.alike(lex("require.resolve('./foo.js', __filename, opts)"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test("require.resolve('id', notTheModule, { with: { imports: 'id' } })", (t) => {
+  t.alike(
+    lex("require.resolve('./foo.js', notTheModule, { with: { imports: './imports.json' } })"),
+    {
+      imports: [],
+      exports: []
+    }
+  )
+})
+
+test("require.addon.resolve('id', { with: { imports: 'id' } })", (t) => {
+  t.alike(lex("require.addon.resolve('./foo.bare', { with: { imports: './imports.json' } })"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test("require.asset('id', { with: { imports: 'id' } })", (t) => {
+  t.alike(lex("require.asset('./foo.txt', { with: { imports: './imports.json' } })"), {
+    imports: [],
+    exports: []
+  })
+})
+
 test("require.asset('id', notTheModule)", (t) => {
   t.alike(lex("require.asset('./foo.txt', notTheModule)"), {
     imports: [],
@@ -1434,6 +1510,107 @@ test('import.meta.resolve("id")', (t) => {
         position: [0, 21, 29]
       }
     ],
+    exports: []
+  })
+})
+
+test("import.meta.resolve('id', { with: { imports: 'id' } })", (t) => {
+  t.alike(lex("import.meta.resolve('./foo.js', { with: { imports: './imports.json' } })"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT | RESOLVE,
+        names: [],
+        attributes: { imports: './imports.json' },
+        position: [0, 21, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("import.meta.resolve('id', import.meta.url, { with: { imports: 'id' } })", (t) => {
+  t.alike(
+    lex(
+      "import.meta.resolve('./foo.js', import.meta.url, { with: { imports: './imports.json' } })"
+    ),
+    {
+      imports: [
+        {
+          specifier: './foo.js',
+          type: IMPORT | RESOLVE,
+          names: [],
+          attributes: { imports: './imports.json' },
+          position: [0, 21, 29]
+        }
+      ],
+      exports: []
+    }
+  )
+})
+
+test("import.meta.resolve('id', import.meta.url, {})", (t) => {
+  t.alike(lex("import.meta.resolve('./foo.js', import.meta.url, {})"), {
+    imports: [
+      {
+        specifier: './foo.js',
+        type: IMPORT | RESOLVE,
+        names: [],
+        attributes: {},
+        position: [0, 21, 29]
+      }
+    ],
+    exports: []
+  })
+})
+
+test("import.meta.resolve('id', import.meta.url, opts)", (t) => {
+  t.alike(lex("import.meta.resolve('./foo.js', import.meta.url, opts)"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test("import.meta.resolve('id', notTheModule, { with: { imports: 'id' } })", (t) => {
+  t.alike(
+    lex("import.meta.resolve('./foo.js', notTheModule, { with: { imports: './imports.json' } })"),
+    {
+      imports: [],
+      exports: []
+    }
+  )
+})
+
+test("import.meta.resolve('id', import.meta.filename, { with: { imports: 'id' } })", (t) => {
+  t.alike(
+    lex(
+      "import.meta.resolve('./foo.js', import.meta.filename, { with: { imports: './imports.json' } })"
+    ),
+    {
+      imports: [
+        {
+          specifier: './foo.js',
+          type: IMPORT | RESOLVE,
+          names: [],
+          attributes: { imports: './imports.json' },
+          position: [0, 21, 29]
+        }
+      ],
+      exports: []
+    }
+  )
+})
+
+test("import.meta.addon.resolve('id', { with: { imports: 'id' } })", (t) => {
+  t.alike(lex("import.meta.addon.resolve('./foo.bare', { with: { imports: './imports.json' } })"), {
+    imports: [],
+    exports: []
+  })
+})
+
+test("import.meta.asset('id', { with: { imports: 'id' } })", (t) => {
+  t.alike(lex("import.meta.asset('./foo.txt', { with: { imports: './imports.json' } })"), {
+    imports: [],
     exports: []
   })
 })
